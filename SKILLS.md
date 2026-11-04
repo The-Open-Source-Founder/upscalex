@@ -19,6 +19,21 @@ Trigger this skill whenever the user:
 
 ---
 
+## Environment Setup
+
+If UpscaleX is not installed in your execution environment, install directly from PyPI:
+
+```bash
+pip install upscalex
+```
+
+Verify that the CLI and compute hardware are ready:
+```bash
+upscalex doctor
+```
+
+---
+
 ## Execution Modes
 
 Agents can interact with UpscaleX via two channels:

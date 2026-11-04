@@ -79,6 +79,7 @@ Comprehensive technical guides are available in the [`docs/`](docs/) directory a
 - [CLI Reference Guide](docs/cli-guide.md): Complete flag documentation, tiling strategies, and execution examples.
 - [Model Context Protocol (MCP) Guide](docs/mcp-guide.md): JSON-RPC tool contracts, parameter schemas, and multi-client configuration.
 - [Architecture & Mathematics Specification](docs/architecture.md): Deep-learning foundations, RRDB networks, Lanczos kernels, and memory bounds.
+- [Error Handling & Troubleshooting](docs/troubleshooting.md): Known failure modes, pre-flight sanitization, and recovery procedures.
 - [Contributing Guide](CONTRIBUTING.md): Code standards, test procedures, and pull request workflow.
 
 ---

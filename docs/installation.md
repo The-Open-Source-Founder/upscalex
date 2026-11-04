@@ -1,51 +1,68 @@
 # UpscaleX Installation Guide
 
-This document provides two installation paths for UpscaleX:
-1. **Agent Autonomous Setup Prompt**: A ready-to-use prompt that can be pasted into any AI coding assistant (Antigravity, Claude Code, Cursor, Windsurf) to automatically install, test, and configure the MCP server.
-2. **Manual Installation Guide**: Step-by-step terminal instructions for Windows, Linux, and macOS.
+This document details installation and configuration procedures for UpscaleX across standalone environments and AI agent workflows:
+1. **PyPI Package Installation**: The fastest one-command setup for CLI and MCP usage.
+2. **Agent Autonomous Setup Prompt**: A copy-paste prompt for AI coding assistants (Antigravity, Claude Code, Cursor, Windsurf).
+3. **Manual Source Installation**: Building and testing from the GitHub repository with `uv` or standard Python.
 
 ---
 
-## 1. Agent Autonomous Setup Prompt
+## 1. Quick Installation via PyPI
+
+UpscaleX is published on PyPI as [`upscalex`](https://pypi.org/project/upscalex/).
+
+```bash
+pip install upscalex
+```
+
+Verify the installation:
+```bash
+# Inspect compute hardware and Vulkan GPU acceleration
+upscalex doctor
+
+# View the open-weight model catalog
+upscalex models
+```
+
+---
+
+## 2. Agent Autonomous Setup Prompt
 
 Copy and paste the following prompt directly into your AI coding assistant:
 
 ```markdown
 Please install and configure the UpscaleX MCP and CLI tool in this environment.
 
+PyPI Package: https://pypi.org/project/upscalex/
 Repository: https://github.com/The-Open-Source-Founder/upscalex.git
 
 Instructions:
-1. Verify Python 3.10+ and git are available.
-2. Clone the repository into an appropriate local tools or workspace directory:
-   git clone https://github.com/The-Open-Source-Founder/upscalex.git
-3. Using uv (or python venv):
-   - Create a virtual environment: uv venv (or python -m venv .venv)
-   - Install the package in editable mode with development dependencies:
-     uv pip install -e ".[dev]"
-4. Execute the test suite to ensure the engine and CLI are operational:
-   uv run pytest -v
-5. Register the MCP server in the client configuration (e.g. claude_desktop_config.json or mcp_config.json):
+1. Verify Python 3.10+ is available.
+2. Install UpscaleX:
+   pip install upscalex
+   (Or clone https://github.com/The-Open-Source-Founder/upscalex.git and install with 'uv pip install -e ".[dev]"')
+3. Test hardware environment and compute engines:
+   upscalex doctor
+4. Register the MCP server in the client configuration (e.g. claude_desktop_config.json or mcp_config.json):
    {
      "mcpServers": {
        "upscalex": {
-         "command": "<ABSOLUTE_PATH_TO_VENV_PYTHON>",
-         "args": ["-m", "upscalex.server"]
+         "command": "upscalex-mcp"
        }
      }
    }
-6. Run "upscalex models" and report confirmation once completed.
+5. Run "upscalex models" and report confirmation once complete.
 ```
 
 ---
 
-## 2. Manual Installation Guide
+## 3. Manual Source Installation
 
 ### Prerequisites
 
 - **Python**: Version 3.10 or higher.
 - **Package Manager**: [`uv`](https://github.com/astral-sh/uv) (recommended) or standard `pip`.
-- **GPU Driver**: Vulkan-compatible GPU drivers (NVIDIA GeForce/RTX, AMD Radeon, or Intel Arc/Iris).
+- **GPU Driver**: Vulkan-compatible GPU drivers (NVIDIA GeForce/RTX, AMD Radeon, or Intel Arc/Iris). Multi-threaded CPU fallback is used if no GPU is found.
 
 ---
 
@@ -88,7 +105,7 @@ pip install -e ".[dev]"
 
 ### Step 3: Run the Verification Suite
 
-Run pytest to verify the engine, CLI commands, and Vulkan inference:
+Run pytest to verify the engine, CLI commands, model catalog, and Vulkan inference:
 
 ```bash
 uv run pytest -v
@@ -96,7 +113,7 @@ uv run pytest -v
 pytest -v
 ```
 
-Expected result: `8 passed`.
+Expected result: `17 passed`.
 
 ---
 
@@ -121,8 +138,18 @@ Configuration file paths:
 - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Linux**: `~/.config/Claude/claude_desktop_config.json`
 
-Add the following entry under `"mcpServers"`:
+If installed globally via `pip`:
+```json
+{
+  "mcpServers": {
+    "upscalex": {
+      "command": "upscalex-mcp"
+    }
+  }
+}
+```
 
+If installed in an isolated `uv` virtual environment:
 ```json
 {
   "mcpServers": {
@@ -139,21 +166,15 @@ Add the following entry under `"mcpServers"`:
 }
 ```
 
-#### Cursor IDE
+#### Cursor IDE & Antigravity
 
-Add to `.cursor/mcp.json` or your project settings:
+Add to `.cursor/mcp.json` or Antigravity's `mcp_config.json`:
 
 ```json
 {
   "mcpServers": {
     "upscalex": {
-      "command": "uv",
-      "args": [
-        "run",
-        "--directory",
-        "/absolute/path/to/upscalex",
-        "upscalex-mcp"
-      ]
+      "command": "upscalex-mcp"
     }
   }
 }
@@ -170,3 +191,10 @@ upscalex upscale input.png --target 16k
 ```
 
 Output file `input_16k.png` will be generated in the same directory.
+
+---
+
+## 4. Troubleshooting and Recovery
+
+For solutions to common issues (missing Vulkan drivers, CMYK auto-conversion, GPU out-of-memory errors, macOS Gatekeeper attributes), consult the comprehensive guide:
+- [Error Handling and Troubleshooting Reference](troubleshooting.md)
