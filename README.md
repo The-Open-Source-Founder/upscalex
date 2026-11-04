@@ -18,6 +18,7 @@ Engineered for digital print workflows, large-format poster production, fine art
 ## Table of Contents
 
 - [Key Features](#key-features)
+- [Visual Quality Comparison](#visual-quality-comparison)
 - [Documentation Directory](#documentation-directory)
 - [Quickstart with uv](#quickstart-with-uv)
 - [Command-Line Interface](#command-line-interface)
@@ -40,6 +41,25 @@ Engineered for digital print workflows, large-format poster production, fine art
 - **Memory-Safe Tiling**: Sliding-window spatial tile decomposition (`--tile-size 256`) processes ultra-gigapixel images without Out-Of-Memory (OOM) failures on 4GB to 8GB GPUs.
 - **Automated Engine Provisioning**: Downloads and validates the precompiled platform binary automatically if not found locally.
 - **Print Fidelity Analysis**: Automatically calculates physical print dimensions in inches and centimeters at 300 DPI, 150 DPI, and 72 DPI.
+
+---
+
+## Visual Quality Comparison
+
+Below is an empirical comparison demonstrating UpscaleX 4x super-resolution reconstruction on a low-resolution pixelated source (`663 × 531` px, 0.35 MP) upscaled to high-definition print fidelity (`2,652 × 2,124` px, 5.63 MP) using the `realesrgan-x4plus` model.
+
+<p align="center">
+  <img src="assets/comparison.png" alt="UpscaleX Quality Comparison" width="100%">
+</p>
+
+| Metric | Original Source | UpscaleX 4x Output |
+| :--- | :--- | :--- |
+| **Pixel Dimensions** | `663 × 531` | **`2,652 × 2,124`** |
+| **Total Megapixels** | 0.35 MP | **5.63 MP** (16× Pixel Multiplication) |
+| **Edge Reconstruction** | Heavy block pixelation, ringing | Reconstructed circular spokes, sharp contours |
+| **Max 300 DPI Print Size** | 2.2 × 1.8 inches | **8.8 × 7.1 inches** |
+| **Model** | — | `realesrgan-x4plus` |
+| **Hardware** | — | NVIDIA GeForce RTX 3050 Laptop GPU (10.8s) |
 
 ---
 
