@@ -149,19 +149,97 @@ For complete options and arguments, see the [CLI Guide](docs/cli-guide.md).
 
 ## Model Context Protocol (MCP) Integration
 
-UpscaleX runs as a native MCP server, enabling LLM agents to inspect image properties, evaluate print viability, and execute upscaling autonomously.
+UpscaleX runs as a native MCP server over `stdio`, enabling AI agents (Claude Desktop, Cursor, Antigravity, Windsurf, Zed) to inspect image metadata, evaluate print viability, and execute upscaling autonomously.
 
 ### Server Invocation
 
 ```bash
+# Standalone entrypoint
 upscalex-mcp
-# or
+
+# Or via CLI
 upscalex serve
 ```
 
 ### Client Configuration
 
-Add this entry to your MCP client configuration file:
+#### Method 1: Using Pip (`pip install upscalex`)
+
+##### A. Claude Desktop
+Configuration file paths:
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "upscalex": {
+      "command": "upscalex-mcp"
+    }
+  }
+}
+```
+*Note: If your environment does not have global pip binaries in PATH, use explicit Python:*
+```json
+{
+  "mcpServers": {
+    "upscalex": {
+      "command": "python",
+      "args": ["-m", "upscalex.server"]
+    }
+  }
+}
+```
+
+##### B. Default / Common MCP Clients (Cursor, Antigravity, Windsurf, Claude Code)
+Configuration file: `mcp_config.json` or `.cursor/mcp.json`
+
+```json
+{
+  "mcpServers": {
+    "upscalex": {
+      "command": "upscalex-mcp"
+    }
+  }
+}
+```
+
+---
+
+#### Method 2: Using Git Clone & Source Checkout
+
+##### A. Claude Desktop (with uv or virtualenv)
+```json
+{
+  "mcpServers": {
+    "upscalex": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/absolute/path/to/upscalex",
+        "upscalex-mcp"
+      ]
+    }
+  }
+}
+```
+*Direct virtual environment alternative (Windows / Linux / macOS):*
+```json
+{
+  "mcpServers": {
+    "upscalex": {
+      "command": "/absolute/path/to/upscalex/.venv/bin/python",
+      "args": ["-m", "upscalex.server"]
+    }
+  }
+}
+```
+*(On Windows, use `C:\\absolute\\path\\to\\upscalex\\.venv\\Scripts\\python.exe`)*
+
+##### B. Default / Common MCP Clients (Cursor, Antigravity, Windsurf)
+Configuration file: `mcp_config.json` or `.cursor/mcp.json`
 
 ```json
 {
@@ -171,7 +249,7 @@ Add this entry to your MCP client configuration file:
       "args": [
         "run",
         "--directory",
-        "/path/to/upscalex",
+        "/absolute/path/to/upscalex",
         "upscalex-mcp"
       ]
     }
@@ -179,7 +257,7 @@ Add this entry to your MCP client configuration file:
 }
 ```
 
-Detailed configuration instructions for Claude Desktop, Antigravity, and Cursor are provided in the [MCP Guide](docs/mcp-guide.md).
+For complete tool schemas and JSON-RPC contracts, see the [MCP Guide](docs/mcp-guide.md).
 
 ---
 
