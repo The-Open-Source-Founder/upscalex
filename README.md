@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.png" alt="UpscaleX Banner" width="100%">
+</p>
+
 # UpscaleX MCP/CLI
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
