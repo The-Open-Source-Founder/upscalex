@@ -12,6 +12,7 @@ The CLI provides five core subcommands:
 | :--- | :--- |
 | `upscale` | Execute high-resolution image upscaling using RealESRGAN models. |
 | `info` | Inspect pixel dimensions, megapixels, color space, and print sizes at 300 DPI. |
+| `doctor` | Inspect cross-platform environment, detected GPUs, and CPU fallback capabilities. |
 | `models` | List all available pre-trained neural network models and their specifications. |
 | `download-engine` | Manually download and verify the precompiled Vulkan binary for your operating system. |
 | `serve` | Run the Model Context Protocol (MCP) server over standard input/output. |
@@ -38,7 +39,7 @@ upscalex upscale [OPTIONS] IMAGE_PATH
 | `-m` | `--model` | Choice | `realesrgan-x4plus` | Model identifier: `realesrgan-x4plus`, `realesrgan-x4plus-anime`, `realesr-animevideov3-x2`, `realesr-animevideov3-x3`, `realesr-animevideov3-x4`. |
 | `-o` | `--output` | Path | None | Explicit path for the processed output file. If omitted, the file is saved adjacent to the input with a resolution suffix. |
 | | `--tile-size` | Integer | `256` | GPU tile dimension in pixels. Essential for managing VRAM allocation and preventing Out-Of-Memory errors. |
-| `-g` | `--gpu-id` | Integer | `1` | Index of the Vulkan compute device to utilize (typically `0` for integrated GPUs and `1` for discrete NVIDIA/AMD graphics). |
+| `-g` | `--gpu-id` | String | `auto` | Vulkan compute device index (`auto` auto-selects discrete GPU, integer ID `0`/`1`, or `cpu` for multi-threaded CPU fallback). |
 | `-x` | `--tta` | Flag | `False` | Enables Test-Time Augmentation (8-pass rotational inference) for maximum visual fidelity at the cost of processing duration. |
 
 ### Usage Examples
@@ -111,7 +112,39 @@ upscalex info IMAGE_PATH
 
 ---
 
-## 4. `models` Command Reference
+## 4. `doctor` Command Reference
+
+Inspects the host system environment, detects available Vulkan compute devices, and verifies CPU fallback capabilities across Windows, Linux, and macOS.
+
+### Syntax
+
+```bash
+upscalex doctor
+```
+
+### Sample Output
+
+```
+                    UpscaleX System & Hardware Diagnostics                     
++-----------------------------------------------------------------------------+
+| Component             | Details                                             |
+|-----------------------+-----------------------------------------------------|
+| Operating System      | Windows (11) / Linux (Ubuntu) / macOS (Darwin)      |
+| Architecture          | AMD64 / ARM64 (Apple Silicon)                       |
+| Python Version        | 3.10+                                               |
+| CPU Logical Cores     | 12                                                  |
+| Vulkan GPU Available  | Yes (or No in Headless/CI environments)              |
+| GPU [0]               | Intel(R) UHD Graphics                               |
+| GPU [1]               | NVIDIA GeForce RTX 3050 Laptop GPU (Discrete /      |
+|                       | Default)                                            |
+| Default Mode          | Vulkan GPU (Device 1: NVIDIA GeForce RTX 3050)      |
+| Recommended Tile Size | 256px                                               |
++-----------------------------------------------------------------------------+
+```
+
+---
+
+## 5. `models` Command Reference
 
 Lists available neural network models, scale factors, and recommended applications.
 

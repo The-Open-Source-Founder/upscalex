@@ -1,5 +1,5 @@
 """
-Tests for CLI commands.
+Tests for CLI commands including diagnostics.
 """
 
 from click.testing import CliRunner
@@ -14,6 +14,13 @@ def test_cli_models():
     result = runner.invoke(main, ["models"])
     assert result.exit_code == 0
     assert "realesrgan-x4plus" in result.output
+
+def test_cli_doctor():
+    runner = CliRunner()
+    result = runner.invoke(main, ["doctor"])
+    assert result.exit_code == 0
+    assert "Operating System" in result.output
+    assert "CPU Logical Cores" in result.output
 
 def test_cli_info():
     runner = CliRunner()
@@ -37,4 +44,5 @@ def test_cli_help():
     assert result.exit_code == 0
     assert "upscale" in result.output
     assert "serve" in result.output
+    assert "doctor" in result.output
     assert "models" in result.output

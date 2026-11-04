@@ -1,5 +1,5 @@
 """
-Unit and integration tests for RealESRGAN engine.
+Unit and integration tests for UpscaleX engine with GPU and CPU fallback verification.
 """
 
 import tempfile
@@ -16,7 +16,7 @@ def sample_image():
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
         img_path = Path(f.name)
     
-    # Create a 64x64 test image with colorful gradient
+    # Create a 64x64 test image with gradient
     img = Image.new("RGB", (64, 64), color=(120, 40, 200))
     img.save(img_path)
     yield img_path
@@ -61,18 +61,50 @@ def test_get_image_metadata(sample_image):
     assert meta["mode"] == "RGB"
     assert "print_size_300dpi_inches" in meta
 
+def test_system_diagnostics():
+    engine = RealESRGANEngine(auto_download=False)
+    diag = engine.get_system_diagnostics()
+
+    assert "os" in diag
+    assert "architecture" in diag
+    assert "cpu_threads" in diag
+    assert "acceleration_mode" in diag
+    assert diag["cpu_threads"] >= 1
+
 def test_list_models():
     engine = RealESRGANEngine(auto_download=False)
     models = engine.list_models()
     assert len(models) == len(AVAILABLE_MODELS)
     assert any(m["model_id"] == "realesrgan-x4plus" for m in models)
 
-def test_live_upscale(sample_image):
-    """Integration test: runs actual 4x and supersampled 8k upscale."""
+def test_cpu_fallback_upscale(sample_image):
+    """Verifies that execution succeeds on CPU-only environments without GPU."""
+    engine = RealESRGANEngine(auto_download=False)
+    out_file = sample_image.parent / "test_cpu_out.png"
+
+    try:
+        result = engine.upscale(
+            input_path=sample_image,
+            output_path=out_file,
+            target="2x",
+            gpu_id="cpu",
+        )
+
+        assert result["success"] is True
+        assert "CPU" in result["acceleration"]
+        assert out_file.exists()
+
+        with Image.open(out_file) as img:
+            assert img.size == (128, 128)
+
+    finally:
+        if out_file.exists():
+            out_file.unlink()
+
+def test_live_upscale_auto(sample_image):
+    """Integration test: runs auto-hardware upscale (Vulkan GPU or CPU)."""
     engine = RealESRGANEngine(auto_download=True)
-    out_dir = sample_image.parent / "test_out"
-    out_dir.mkdir(exist_ok=True)
-    out_file = out_dir / "sample_upscaled_4x.png"
+    out_file = sample_image.parent / "test_live_out.png"
 
     try:
         result = engine.upscale(
@@ -81,21 +113,15 @@ def test_live_upscale(sample_image):
             target="4x",
             model="realesrgan-x4plus",
             tile_size=64,
-            gpu_id=1,
+            gpu_id="auto",
         )
 
         assert result["success"] is True
         assert out_file.exists()
-        
-        # Verify output dimensions (64x64 -> 256x256)
+
         with Image.open(out_file) as img:
             assert img.size == (256, 256)
 
     finally:
         if out_file.exists():
             out_file.unlink()
-        if out_dir.exists():
-            try:
-                out_dir.rmdir()
-            except OSError:
-                pass

@@ -16,7 +16,7 @@ from rich.table import Table
 
 from .engine import AVAILABLE_MODELS, RealESRGANEngine
 from .server import mcp
-from .utils import download_and_extract_engine
+from .utils import download_and_extract_engine, get_system_diagnostics
 
 console = Console()
 
@@ -43,7 +43,7 @@ def main():
 )
 @click.option("-o", "--output", default=None, help="Output destination file path.")
 @click.option("--tile-size", default=256, type=int, help="GPU tile size in pixels (safe for 4GB VRAM).", show_default=True)
-@click.option("-g", "--gpu-id", default=1, type=int, help="Vulkan GPU device index (1 for discrete GPU).", show_default=True)
+@click.option("-g", "--gpu-id", default="auto", type=str, help="Vulkan GPU device index ('auto', integer ID, or 'cpu').", show_default=True)
 @click.option("-x", "--tta", is_flag=True, default=False, help="Enable Test-Time Augmentation (higher quality, slower).")
 def upscale(
     image_path: str,
@@ -51,7 +51,7 @@ def upscale(
     model: str,
     output: Optional[str],
     tile_size: int,
-    gpu_id: int,
+    gpu_id: str,
     tta: bool,
 ):
     """Upscale an image to 8K, 16K, or custom print resolutions."""
@@ -67,7 +67,7 @@ def upscale(
             f"[bold cyan]Input:[/bold cyan] {meta['file_name']}\n"
             f"[bold cyan]Original Resolution:[/bold cyan] {meta['width']} × {meta['height']} ({meta['megapixels_str']})\n"
             f"[bold cyan]Target Mode:[/bold cyan] [bold green]{target.upper()}[/bold green]\n"
-            f"[bold cyan]Model:[/bold cyan] {model} | [bold cyan]GPU ID:[/bold cyan] {gpu_id} | [bold cyan]Tile Size:[/bold cyan] {tile_size}px",
+            f"[bold cyan]Model:[/bold cyan] {model} | [bold cyan]Hardware:[/bold cyan] {gpu_id} | [bold cyan]Tile Size:[/bold cyan] {tile_size}px",
             title="[bold yellow]UpscaleX CLI[/bold yellow]",
             border_style="cyan",
         )
@@ -81,7 +81,7 @@ def upscale(
         TimeElapsedColumn(),
         console=console,
     ) as progress:
-        task_id = progress.add_task("[cyan]Upscaling tiles on GPU...", total=100.0)
+        task_id = progress.add_task("[cyan]Processing tiles...", total=100.0)
 
         def on_progress(pct: float):
             progress.update(task_id, completed=pct)
@@ -111,6 +111,7 @@ def upscale(
     table.add_row("Final Resolution", f"{result['output_resolution']} ({result['output_megapixels']})")
     table.add_row("Resolution Gain", f"{result['original_megapixels']} -> {result['output_megapixels']}")
     table.add_row("File Size", f"{result['file_size_str']}")
+    table.add_row("Acceleration", f"{result['acceleration']}")
     table.add_row("Duration", f"{result['processing_seconds']} seconds")
     table.add_row("Model Used", str(result["model_used"]))
 
@@ -123,13 +124,11 @@ def info(image_path: str):
     try:
         engine = RealESRGANEngine(auto_download=False)
     except Exception:
-        # Fallback to direct inspection if binary is not yet installed
         engine = None
 
     if engine:
         meta = engine.get_image_metadata(image_path)
     else:
-        # Standalone inspection using Pillow directly
         from PIL import Image
         from .utils import format_bytes, format_megapixels
         p = Path(image_path)
@@ -163,6 +162,37 @@ def info(image_path: str):
     table.add_row("File Size", str(meta['file_size_str']))
     table.add_row("Print Size (300 DPI)", str(meta['print_size_300dpi_inches']))
     table.add_row("Print Size (Metric)", str(meta['print_size_300dpi_cm']))
+
+    console.print(table)
+
+@main.command()
+def doctor():
+    """Inspect cross-platform system environment, CPU threads, and GPU acceleration hardware."""
+    try:
+        engine = RealESRGANEngine(auto_download=False)
+        diag = engine.get_system_diagnostics()
+    except Exception:
+        diag = get_system_diagnostics()
+
+    table = Table(title="UpscaleX System & Hardware Diagnostics", border_style="blue", header_style="bold blue")
+    table.add_column("Component", style="bold")
+    table.add_column("Details", style="cyan")
+
+    table.add_row("Operating System", f"{diag['os']} ({diag['os_release']})")
+    table.add_row("Architecture", diag['architecture'])
+    table.add_row("Python Version", diag['python_version'])
+    table.add_row("CPU Logical Cores", str(diag['cpu_threads']))
+    table.add_row("Vulkan GPU Available", "Yes" if diag['has_vulkan_gpu'] else "No (CPU Multi-Threaded Mode)")
+
+    if diag['detected_gpus']:
+        for g in diag['detected_gpus']:
+            marker = " (Discrete / Default)" if g['id'] == diag.get('recommended_gpu_id') else ""
+            table.add_row(f"GPU [{g['id']}]", f"{g['name']}{marker}")
+    else:
+        table.add_row("GPU Devices", "None detected (Headless or CPU-only environment)")
+
+    table.add_row("Default Mode", diag['acceleration_mode'])
+    table.add_row("Recommended Tile Size", f"{diag['recommended_tile_size']}px")
 
     console.print(table)
 

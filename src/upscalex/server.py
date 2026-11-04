@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from fastmcp import FastMCP
 
@@ -33,11 +33,12 @@ def upscale_image(
     model: str = "realesrgan-x4plus",
     output_path: Optional[str] = None,
     tile_size: int = 256,
-    gpu_id: int = 1,
+    gpu_id: str = "auto",
     tta: bool = False,
 ) -> Dict[str, Any]:
     """
-    Upscale an image to 8K, 16K, 4x, or custom resolution using RealESRGAN.
+    Upscale an image to 8K, 16K, 4x, or custom resolution using UpscaleX.
+    Automatically optimizes between Vulkan GPU acceleration and multi-threaded CPU fallback.
 
     Args:
         image_path: Absolute or relative path to the source image (PNG, JPG, WEBP).
@@ -47,11 +48,12 @@ def upscale_image(
                'realesrgan-x4plus-anime' for 2D art/illustrations).
         output_path: Optional path for the upscaled output. If omitted, saves next to source.
         tile_size: GPU tile size in pixels (default 256, safe for 4GB-8GB VRAM).
-        gpu_id: Vulkan GPU device index (typically 1 for discrete NVIDIA GPU on laptops).
+        gpu_id: Hardware device selection: 'auto' (picks discrete GPU), integer ID ('0', '1'),
+                or 'cpu' for CPU-only multi-threaded processing.
         tta: Enable Test-Time Augmentation for higher quality at the cost of speed.
 
     Returns:
-        Dictionary containing upscale metrics, output path, final resolution, and duration.
+        Dictionary containing upscale metrics, output path, final resolution, acceleration mode, and duration.
     """
     engine = get_engine()
     return engine.upscale(
@@ -89,6 +91,18 @@ def list_available_models() -> List[Dict[str, Any]]:
     """
     engine = get_engine()
     return engine.list_models()
+
+@mcp.tool()
+def get_system_diagnostics() -> Dict[str, Any]:
+    """
+    Check cross-platform hardware profile, OS, CPU thread count, Vulkan status,
+    and detected GPU acceleration hardware.
+
+    Returns:
+        Hardware diagnostics dictionary.
+    """
+    engine = get_engine()
+    return engine.get_system_diagnostics()
 
 @mcp.tool()
 def calculate_print_dpi(

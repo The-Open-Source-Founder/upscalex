@@ -1,17 +1,22 @@
 """
-Utility functions for RealESRGAN engine, downloader, and formatters.
+Utility functions for UpscaleX engine, cross-platform hardware detection, downloader, and formatters.
 """
 
 from __future__ import annotations
 
 import os
 import platform
+import re
 import shutil
+import subprocess
 import sys
+import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+from PIL import Image
 
 # Official Real-ESRGAN release binary URLs
 RELEASE_URLS = {
@@ -40,7 +45,7 @@ def get_binary_name() -> str:
 def download_and_extract_engine(dest_dir: Optional[Path] = None, progress_callback = None) -> Path:
     """
     Downloads and extracts the official pre-compiled Real-ESRGAN binary.
-    Returns the path to the executable.
+    Ensures POSIX execution permissions and clears macOS quarantine flags.
     """
     system_name = platform.system()
     if system_name not in RELEASE_URLS:
@@ -68,9 +73,16 @@ def download_and_extract_engine(dest_dir: Optional[Path] = None, progress_callba
         with zipfile.ZipFile(zip_path, "r") as zf:
             zf.extractall(target_dir)
 
-        # Ensure executable permissions on POSIX
+        # Set execution permissions on Linux/macOS
         if sys.platform != "win32" and bin_path.exists():
             bin_path.chmod(bin_path.stat().st_mode | 0o755)
+
+        # Remove macOS quarantine flag if on Darwin
+        if sys.platform == "darwin":
+            try:
+                subprocess.run(["xattr", "-cr", str(target_dir)], check=False, capture_output=True)
+            except Exception:
+                pass
 
         return bin_path
     finally:
@@ -79,6 +91,96 @@ def download_and_extract_engine(dest_dir: Optional[Path] = None, progress_callba
                 zip_path.unlink()
             except OSError:
                 pass
+
+def probe_vulkan_gpus(binary_path: Path, models_dir: Path) -> List[Dict[str, Any]]:
+    """
+    Probes available Vulkan compute devices through the native runtime.
+    Returns list of discovered GPU devices and indices.
+    """
+    if not binary_path.exists():
+        return []
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f_in:
+        Image.new("RGB", (16, 16), "black").save(f_in.name)
+        tmp_in = f_in.name
+
+    tmp_out = Path(tempfile.gettempdir()) / f"probe_{os.getpid()}.png"
+
+    try:
+        cmd = [
+            str(binary_path),
+            "-i", tmp_in,
+            "-o", str(tmp_out),
+            "-m", str(models_dir),
+            "-v",
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
+        output = proc.stdout + "\n" + proc.stderr
+
+        # Pattern matches device declarations: [0 Intel UHD], [1 NVIDIA GeForce RTX...]
+        pattern = re.compile(r"\[(\d+)\s+([^\]]+)\]\s+queueC")
+        devices = []
+        seen = set()
+
+        for match in pattern.finditer(output):
+            dev_id = int(match.group(1))
+            dev_name = match.group(2).strip()
+            if dev_id not in seen:
+                seen.add(dev_id)
+                is_discrete = any(k in dev_name.lower() for k in ["nvidia", "geforce", "rtx", "gtx", "radeon", "rx", "apple", "discrete"])
+                devices.append({
+                    "id": dev_id,
+                    "name": dev_name,
+                    "is_discrete": is_discrete,
+                })
+
+        return devices
+    except Exception:
+        return []
+    finally:
+        for f in [Path(tmp_in), tmp_out]:
+            if f.exists():
+                try:
+                    f.unlink()
+                except OSError:
+                    pass
+
+def get_system_diagnostics(binary_path: Optional[Path] = None, models_dir: Optional[Path] = None) -> Dict[str, Any]:
+    """
+    Returns complete cross-platform environment diagnostics including
+    OS, architecture, CPU threads, and detected GPU acceleration hardware.
+    """
+    sys_name = platform.system()
+    arch = platform.machine()
+    cpu_count = os.cpu_count() or 1
+
+    gpus = []
+    if binary_path and models_dir and binary_path.exists():
+        gpus = probe_vulkan_gpus(binary_path, models_dir)
+
+    # Determine recommended acceleration strategy
+    if gpus:
+        discrete = [g for g in gpus if g["is_discrete"]]
+        selected_gpu = discrete[0]["id"] if discrete else gpus[0]["id"]
+        accel_mode = f"Vulkan GPU (Device {selected_gpu}: {gpus[selected_gpu]['name']})"
+        recommended_tile = 256
+    else:
+        selected_gpu = None
+        accel_mode = f"CPU Multi-Threaded (Lanczos-3, {cpu_count} threads)"
+        recommended_tile = 256
+
+    return {
+        "os": sys_name,
+        "os_release": platform.release(),
+        "architecture": arch,
+        "python_version": platform.python_version(),
+        "cpu_threads": cpu_count,
+        "has_vulkan_gpu": len(gpus) > 0,
+        "detected_gpus": gpus,
+        "recommended_gpu_id": selected_gpu,
+        "acceleration_mode": accel_mode,
+        "recommended_tile_size": recommended_tile,
+    }
 
 def format_bytes(size: int | float) -> str:
     """Format bytes into a human-readable string (KB, MB, GB)."""

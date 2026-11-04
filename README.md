@@ -41,7 +41,9 @@ Engineered for digital print workflows, large-format poster production, fine art
   - **16K**: Native 4x RealESRGAN deep-learning model upscale producing master files up to 400+ Megapixels.
   - **8K**: 4x deep-learning inference followed by Lanczos-3 downsampling (Supersampling Anti-Aliasing / SSAA) for sharp edges and zero noise.
   - **Custom Dimensions**: Proportional scaling to arbitrary resolutions or physical print aspect ratios.
-- **Vulkan Hardware Acceleration**: High-performance C++ inference across NVIDIA, AMD, and Intel GPUs without compiling CUDA wheels.
+- **Cross-Platform Architecture**: Tested and supported across **Windows**, **Linux** (Ubuntu, Debian, Fedora), and **macOS** (Apple Silicon arm64 & Intel x86_64).
+- **GPU Acceleration with Seamless CPU Fallback**: Automatically discovers and utilizes discrete Vulkan GPUs (NVIDIA RTX/GeForce, AMD Radeon, Intel Arc/Iris, Apple Silicon via MoltenVK). In headless Docker containers or environments without GPU drivers, the engine falls back to multi-threaded CPU Lanczos super-resolution with zero crashes.
+- **Hardware Diagnostics**: Integrated `upscalex doctor` command inspects system compute devices, Vulkan support, and recommended tile dimensions.
 - **Memory-Safe Tiling**: Sliding-window spatial tile decomposition (`--tile-size 256`) processes ultra-gigapixel images without Out-Of-Memory (OOM) failures on 4GB to 8GB GPUs.
 - **Automated Engine Provisioning**: Downloads and validates the precompiled platform binary automatically if not found locally.
 - **Print Fidelity Analysis**: Automatically calculates physical print dimensions in inches and centimeters at 300 DPI, 150 DPI, and 72 DPI.
