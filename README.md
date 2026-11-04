@@ -4,6 +4,7 @@
 
 # UpscaleX MCP/CLI
 
+[![PyPI: Version](https://img.shields.io/pypi/v/upscalex.svg)](https://pypi.org/project/upscalex/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![MCP: Enabled](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io)
