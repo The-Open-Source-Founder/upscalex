@@ -1,6 +1,6 @@
 """
 Core UpscaleX execution engine, resolution planner, cross-platform hardware resolver,
-model catalog, and dynamic recommendation system.
+model catalog, pre-flight sanitization, and dynamic recommendation system.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-from PIL import Image, ImageFilter, ImageStat
+from PIL import Image, ImageFilter, ImageOps, ImageStat
 
 # Disable PIL's DecompressionBomb check for ultra-large multi-gigapixel print renders
 Image.MAX_IMAGE_PIXELS = None
@@ -132,7 +132,7 @@ AVAILABLE_MODELS = {k: {"scale": v["scale"], "type": v["type"], "description": v
 class RealESRGANEngine:
     """
     Manages RealESRGAN binary execution, cross-platform hardware resolution (Vulkan GPU vs CPU),
-    dynamic model downloading, model recommendation, and resolution supersampling.
+    dynamic model downloading, model recommendation, pre-flight sanitization, and resolution supersampling.
     """
 
     def __init__(
@@ -202,6 +202,53 @@ class RealESRGANEngine:
 
         return adjacent
 
+    def validate_and_sanitize_input(self, image_path: Union[str, Path]) -> Tuple[Path, bool, int, int]:
+        """
+        Pre-flight image sanitization:
+        - Validates file existence and non-zero length.
+        - Corrects smartphone EXIF rotation orientation.
+        - Converts CMYK, Palette, and Monochrome modes to standard RGB/RGBA.
+        Returns: (processed_path, was_temporary, width, height)
+        """
+        in_p = Path(image_path).resolve()
+        if not in_p.exists():
+            raise FileNotFoundError(f"Image file does not exist: {image_path}")
+
+        if in_p.is_dir():
+            raise ValueError(f"Path is a directory, expected an image file: {image_path}")
+
+        if in_p.stat().st_size == 0:
+            raise ValueError(f"Image file is empty (0 bytes): {image_path}")
+
+        try:
+            with Image.open(in_p) as img:
+                orig_mode = img.mode
+                # Check EXIF orientation
+                transposed = ImageOps.exif_transpose(img) or img
+                needs_transposition = transposed.size != img.size or transposed is not img
+
+                # Check color mode: ncnn runtimes require RGB or RGBA
+                needs_conversion = orig_mode not in ("RGB", "RGBA")
+
+                width, height = transposed.size
+
+                if not needs_transposition and not needs_conversion:
+                    return in_p, False, width, height
+
+                # Convert to clean RGB (or RGBA if transparent)
+                has_alpha = "A" in orig_mode or "transparency" in img.info
+                target_mode = "RGBA" if has_alpha else "RGB"
+                sanitized_img = transposed.convert(target_mode)
+
+                temp_fd, temp_path = tempfile.mkstemp(suffix=".png", prefix="sanitized_")
+                os.close(temp_fd)
+                sanitized_p = Path(temp_path)
+                sanitized_img.save(sanitized_p, format="PNG")
+                return sanitized_p, True, width, height
+
+        except Exception as e:
+            raise ValueError(f"File '{in_p.name}' is corrupted or not a recognized image: {e}")
+
     def is_model_installed(self, model_id: str) -> bool:
         """Checks if all required model weight files exist locally."""
         if model_id not in MODEL_CATALOG:
@@ -210,9 +257,7 @@ class RealESRGANEngine:
         return all((self.models_dir / f).exists() for f in meta["files"])
 
     def download_model(self, model_id: str, progress_callback: Optional[Callable[[int, int], None]] = None) -> Dict[str, Any]:
-        """
-        Downloads open-weight model files from upstream mirrors directly into the models directory.
-        """
+        """Downloads open-weight model files on demand into the models directory."""
         if model_id not in MODEL_CATALOG:
             valid = ", ".join(MODEL_CATALOG.keys())
             raise ValueError(f"Unknown model '{model_id}'. Catalog models: {valid}")
@@ -265,112 +310,113 @@ class RealESRGANEngine:
             raise RuntimeError(f"Failed to download model '{model_id}' from {url}: {e}")
 
     def recommend_model(self, image_path: Union[str, Path], priority: str = "balanced") -> Dict[str, Any]:
-        """
-        Inspects host hardware specifications (GPU VRAM, CPU cores) and image characteristics
-        (color variance, entropy, resolution) to recommend the optimal upscaling model and settings.
-        """
-        in_p = Path(image_path).resolve()
-        if not in_p.is_file():
-            raise FileNotFoundError(f"Image not found: {image_path}")
+        """Inspects host hardware and image characteristics to recommend model and settings."""
+        sanitized_p, was_temp, orig_w, orig_h = self.validate_and_sanitize_input(image_path)
+        try:
+            diag = self.get_system_diagnostics()
+            meta = self.get_image_metadata(sanitized_p)
 
-        diag = self.get_system_diagnostics()
-        meta = self.get_image_metadata(in_p)
+            with Image.open(sanitized_p) as img:
+                thumb = img.convert("RGB").resize((128, 128))
+                stat = ImageStat.Stat(thumb)
+                avg_stddev = sum(stat.stddev) / 3.0
+                unique_colors = len(thumb.getcolors(maxcolors=16384) or [])
 
-        # Image content heuristic: analyze color variance & flat region ratio
-        with Image.open(in_p) as img:
-            thumb = img.convert("RGB").resize((128, 128))
-            stat = ImageStat.Stat(thumb)
-            avg_stddev = sum(stat.stddev) / 3.0
-            unique_colors = len(thumb.getcolors(maxcolors=16384) or [])
+            is_illustration = (unique_colors < 6000 and avg_stddev < 60.0) or (unique_colors < 3500)
+            image_class = "2D Illustration / Vector Art / Anime" if is_illustration else "Photographic / Continuous Tone / Fine Art"
 
-        # Classification heuristic: low variance / restricted palette -> 2D/Anime/Vector; high variance -> Photo
-        is_illustration = (unique_colors < 6000 and avg_stddev < 60.0) or (unique_colors < 3500)
-        image_class = "2D Illustration / Vector Art / Anime" if is_illustration else "Photographic / Continuous Tone / Fine Art"
+            has_gpu = diag["has_vulkan_gpu"]
+            discrete_gpus = [g for g in diag.get("detected_gpus", []) if g.get("is_discrete")]
+            is_discrete = len(discrete_gpus) > 0
+            gpu_name = discrete_gpus[0]["name"] if is_discrete else (diag.get("detected_gpus", [{}])[0].get("name") if has_gpu else "CPU")
 
-        # Hardware evaluation
-        has_gpu = diag["has_vulkan_gpu"]
-        discrete_gpus = [g for g in diag.get("detected_gpus", []) if g.get("is_discrete")]
-        is_discrete = len(discrete_gpus) > 0
-        gpu_name = discrete_gpus[0]["name"] if is_discrete else (diag.get("detected_gpus", [{}])[0].get("name") if has_gpu else "CPU")
-
-        # Determine target resolution preset
-        orig_mp = meta["megapixels"]
-        if orig_mp >= 20.0:
-            rec_target = "16k"
-            target_reason = "Source image is >=20 MP. Native 16K (4x) upscale is ideal for large-format exhibition master prints."
-        elif orig_mp >= 5.0:
-            rec_target = "8k"
-            target_reason = "Source image is 5-20 MP. 8K supersampling (4x + Lanczos) delivers maximum edge clarity with zero noise."
-        else:
-            rec_target = "4k"
-            target_reason = "Source image is low-resolution (<5 MP). 4K target provides clean restoration without over-magnifying artifacts."
-
-        # Select model and settings based on hardware + content
-        if not has_gpu:
-            rec_model = "realesr-animevideov3-x4" if is_illustration else "realesrgan-x4plus"
-            rec_tile = 128
-            hw_tier = "CPU Multi-Threaded"
-            rec_reasoning = f"No discrete GPU detected. Using {rec_model} with 128px tiling for CPU-safe execution."
-        elif not is_discrete:
-            # Integrated GPU (Intel UHD / Iris)
-            rec_model = "realesr-animevideov3-x4" if is_illustration else "realesrgan-x4plus"
-            rec_tile = 128
-            hw_tier = "Integrated GPU (Shared System RAM)"
-            rec_reasoning = f"Integrated GPU detected ({gpu_name}). 128px tiling prevents system memory pressure and driver timeouts."
-        else:
-            # Dedicated GPU (RTX / Radeon)
-            rec_tile = 256
-            hw_tier = f"Dedicated GPU ({gpu_name})"
-            if is_illustration:
-                rec_model = "realesrgan-x4plus-anime"
-                rec_reasoning = f"Detected {image_class} on {gpu_name}. 'realesrgan-x4plus-anime' provides clean contour preservation and flat color smoothing."
+            orig_mp = meta["megapixels"]
+            if orig_mp >= 20.0:
+                rec_target = "16k"
+                target_reason = "Source image is >=20 MP. Native 16K (4x) upscale is ideal for large-format exhibition master prints."
+            elif orig_mp >= 5.0:
+                rec_target = "8k"
+                target_reason = "Source image is 5-20 MP. 8K supersampling (4x + Lanczos) delivers maximum edge clarity with zero noise."
             else:
-                rec_model = "realesrgan-x4plus"
-                rec_reasoning = f"Detected {image_class} on {gpu_name}. 'realesrgan-x4plus' with 256px tiling delivers pristine textural and fine-art fidelity."
+                rec_target = "4k"
+                target_reason = "Source image is low-resolution (<5 MP). 4K target provides clean restoration without over-magnifying artifacts."
 
-        cmd_sample = f'upscalex upscale "{in_p.name}" --target {rec_target} --model {rec_model} --tile-size {rec_tile}'
+            if not has_gpu:
+                rec_model = "realesr-animevideov3-x4" if is_illustration else "realesrgan-x4plus"
+                rec_tile = 128
+                hw_tier = "CPU Multi-Threaded"
+                rec_reasoning = f"No discrete GPU detected. Using {rec_model} with 128px tiling for CPU-safe execution."
+            elif not is_discrete:
+                rec_model = "realesr-animevideov3-x4" if is_illustration else "realesrgan-x4plus"
+                rec_tile = 128
+                hw_tier = "Integrated GPU (Shared System RAM)"
+                rec_reasoning = f"Integrated GPU detected ({gpu_name}). 128px tiling prevents system memory pressure and driver timeouts."
+            else:
+                rec_tile = 256
+                hw_tier = f"Dedicated GPU ({gpu_name})"
+                if is_illustration:
+                    rec_model = "realesrgan-x4plus-anime"
+                    rec_reasoning = f"Detected {image_class} on {gpu_name}. 'realesrgan-x4plus-anime' provides clean contour preservation and flat color smoothing."
+                else:
+                    rec_model = "realesrgan-x4plus"
+                    rec_reasoning = f"Detected {image_class} on {gpu_name}. 'realesrgan-x4plus' with 256px tiling delivers pristine textural and fine-art fidelity."
 
-        return {
-            "image_path": str(in_p),
-            "file_name": in_p.name,
-            "detected_content_type": image_class,
-            "hardware_tier": hw_tier,
-            "recommended_model": rec_model,
-            "recommended_target": rec_target,
-            "recommended_tile_size": rec_tile,
-            "recommended_gpu_id": "auto",
-            "target_resolution_reasoning": target_reason,
-            "model_selection_reasoning": rec_reasoning,
-            "ready_command": cmd_sample,
-            "is_model_installed": self.is_model_installed(rec_model),
-        }
+            in_p = Path(image_path).resolve()
+            cmd_sample = f'upscalex upscale "{in_p.name}" --target {rec_target} --model {rec_model} --tile-size {rec_tile}'
+
+            return {
+                "image_path": str(in_p),
+                "file_name": in_p.name,
+                "detected_content_type": image_class,
+                "hardware_tier": hw_tier,
+                "recommended_model": rec_model,
+                "recommended_target": rec_target,
+                "recommended_tile_size": rec_tile,
+                "recommended_gpu_id": "auto",
+                "target_resolution_reasoning": target_reason,
+                "model_selection_reasoning": rec_reasoning,
+                "ready_command": cmd_sample,
+                "is_model_installed": self.is_model_installed(rec_model),
+            }
+        finally:
+            if was_temp and sanitized_p.exists():
+                try:
+                    sanitized_p.unlink()
+                except OSError:
+                    pass
 
     def resolve_device(self, requested_gpu: Optional[Union[int, str]] = "auto") -> Tuple[str, Optional[int]]:
-        """
-        Determines execution device: 'vulkan' with device ID, or 'cpu'.
-        """
-        if isinstance(requested_gpu, str) and requested_gpu.strip().lower() in ("cpu", "-1", "none"):
+        """Determines execution device with safe boundary checks."""
+        req_str = str(requested_gpu).strip().lower()
+        if req_str in ("cpu", "-1", "none"):
             return "cpu", None
 
-        if isinstance(requested_gpu, int) and requested_gpu >= 0:
-            return "vulkan", requested_gpu
+        # Check Vulkan availability
+        if not self.binary_path.exists():
+            return "cpu", None
 
-        # Auto detection mode
-        if self.binary_path.exists():
-            gpus = probe_vulkan_gpus(self.binary_path, self.models_dir)
-            if gpus:
-                discrete = [g for g in gpus if g["is_discrete"]]
-                chosen_id = discrete[0]["id"] if discrete else gpus[0]["id"]
-                return "vulkan", chosen_id
+        gpus = probe_vulkan_gpus(self.binary_path, self.models_dir)
+        if not gpus:
+            return "cpu", None
 
-        return "cpu", None
+        available_ids = [g["id"] for g in gpus]
+
+        if req_str.isdigit():
+            req_id = int(req_str)
+            if req_id in available_ids:
+                return "vulkan", req_id
+            # If requested GPU ID out of range, fallback safely to first available or discrete
+            discrete = [g for g in gpus if g["is_discrete"]]
+            return "vulkan", discrete[0]["id"] if discrete else gpus[0]["id"]
+
+        # Auto detection
+        discrete = [g for g in gpus if g["is_discrete"]]
+        chosen_id = discrete[0]["id"] if discrete else gpus[0]["id"]
+        return "vulkan", chosen_id
 
     def get_image_metadata(self, image_path: Union[str, Path]) -> Dict[str, Union[str, int, float]]:
-        """
-        Extracts comprehensive image metrics including dimensions, aspect ratio,
-        file size, and estimated print dimensions at 300 DPI.
-        """
-        p = Path(image_path)
+        """Extracts comprehensive image metrics and print sizing."""
+        p = Path(image_path).resolve()
         if not p.is_file():
             raise FileNotFoundError(f"Image not found: {image_path}")
 
@@ -390,7 +436,7 @@ class RealESRGANEngine:
 
         return {
             "file_name": p.name,
-            "file_path": str(p.resolve()),
+            "file_path": str(p),
             "width": width,
             "height": height,
             "aspect_ratio": round(aspect_ratio, 4),
@@ -408,15 +454,18 @@ class RealESRGANEngine:
     def calculate_target_dimensions(
         self, original_width: int, original_height: int, target: str
     ) -> Tuple[int, int, str]:
-        """
-        Determines target width and height based on user request.
-        """
+        """Determines target dimensions with boundary validation."""
+        if original_width <= 0 or original_height <= 0:
+            raise ValueError(f"Invalid original dimensions: {original_width}x{original_height}")
+
         target_clean = str(target).strip().lower()
 
         if target_clean in ("16k", "16-k"):
-            return original_width * 4, original_height * 4, "16K (4× native upscale)"
+            target_w, target_h = original_width * 4, original_height * 4
+            desc = "16K (4× native upscale)"
         elif target_clean in ("8k", "8-k"):
-            return original_width * 2, original_height * 2, "8K (2× supersampled upscale)"
+            target_w, target_h = original_width * 2, original_height * 2
+            desc = "8K (2× supersampled upscale)"
         elif target_clean in ("4k", "4-k"):
             scale = 4000.0 / max(original_width, original_height)
             if scale <= 1.0:
@@ -425,22 +474,34 @@ class RealESRGANEngine:
             else:
                 target_w = int(round(original_width * scale))
                 target_h = int(round(original_height * scale))
-            return target_w, target_h, "4K proportional"
+            desc = "4K proportional"
         elif target_clean in ("4x", "4×"):
-            return original_width * 4, original_height * 4, "4× upscale"
+            target_w, target_h = original_width * 4, original_height * 4
+            desc = "4× upscale"
         elif target_clean in ("2x", "2×"):
-            return original_width * 2, original_height * 2, "2× upscale"
+            target_w, target_h = original_width * 2, original_height * 2
+            desc = "2× upscale"
         elif target_clean in ("3x", "3×"):
-            return original_width * 3, original_height * 3, "3× upscale"
+            target_w, target_h = original_width * 3, original_height * 3
+            desc = "3× upscale"
         elif "x" in target_clean:
             match = re.match(r"^(\d+)\s*[xX]\s*(\d+)$", target_clean)
             if match:
-                w, h = int(match.group(1)), int(match.group(2))
-                return w, h, f"Custom {w}×{h}"
+                target_w, target_h = int(match.group(1)), int(match.group(2))
+                desc = f"Custom {target_w}×{target_h}"
+            else:
+                raise ValueError(
+                    f"Invalid custom dimension format '{target}'. Example format: '8000x6000' or '16k'."
+                )
+        else:
+            raise ValueError(
+                f"Unknown target resolution: '{target}'. Supported: '16k', '8k', '4k', '4x', '2x', '3x', or 'WIDTHxHEIGHT'."
+            )
 
-        raise ValueError(
-            f"Unknown target resolution: '{target}'. Supported: '16k', '8k', '4k', '4x', '2x', '3x', or 'WIDTHxHEIGHT'."
-        )
+        if target_w <= 0 or target_h <= 0:
+            raise ValueError(f"Calculated dimensions must be greater than 0, got {target_w}x{target_h}")
+
+        return target_w, target_h, desc
 
     def _upscale_cpu(
         self,
@@ -451,7 +512,7 @@ class RealESRGANEngine:
         format: str,
         progress_callback: Optional[Callable[[float], None]] = None,
     ):
-        """High-performance multi-threaded CPU fallback upscaler."""
+        """Multi-threaded CPU fallback upscaler."""
         if progress_callback:
             progress_callback(10.0)
 
@@ -486,131 +547,134 @@ class RealESRGANEngine:
         progress_callback: Optional[Callable[[float], None]] = None,
     ) -> Dict[str, Any]:
         """
-        Executes high-resolution upscaling with hardware auto-selection.
+        Executes high-resolution upscaling with pre-flight sanitization,
+        GPU auto-selection, and automatic CPU fallback.
         """
-        in_p = Path(input_path).resolve()
-        if not in_p.is_file():
-            raise FileNotFoundError(f"Input image not found: {input_path}")
+        # Pre-flight sanitization (EXIF orientation and color space)
+        sanitized_input, was_temp_input, orig_w, orig_h = self.validate_and_sanitize_input(input_path)
 
-        if model not in MODEL_CATALOG:
-            valid = ", ".join(MODEL_CATALOG.keys())
-            raise ValueError(f"Invalid model '{model}'. Available models: {valid}")
+        try:
+            if model not in MODEL_CATALOG:
+                valid = ", ".join(MODEL_CATALOG.keys())
+                raise ValueError(f"Invalid model '{model}'. Available models: {valid}")
 
-        # Ensure model weights are available
-        if not self.is_model_installed(model):
-            # Auto download if downloadable
-            if MODEL_CATALOG[model].get("download_url"):
-                self.download_model(model)
+            if not self.is_model_installed(model):
+                if MODEL_CATALOG[model].get("download_url"):
+                    self.download_model(model)
+                else:
+                    raise FileNotFoundError(f"Model weights for '{model}' not found in {self.models_dir}.")
+
+            target_w, target_h, target_desc = self.calculate_target_dimensions(orig_w, orig_h, target)
+
+            orig_in_p = Path(input_path).resolve()
+            if not output_path:
+                tag = str(target).lower().replace(" ", "_")
+                out_p = orig_in_p.parent / f"{orig_in_p.stem}_{tag}.{format.lower()}"
             else:
-                raise FileNotFoundError(f"Model weights for '{model}' not found in {self.models_dir}.")
+                out_p = Path(output_path).resolve()
 
-        with Image.open(in_p) as img:
-            orig_w, orig_h = img.size
+            out_p.parent.mkdir(parents=True, exist_ok=True)
 
-        target_w, target_h, target_desc = self.calculate_target_dimensions(orig_w, orig_h, target)
+            mode, resolved_gpu_id = self.resolve_device(gpu_id)
+            start_time = time.time()
+            used_acceleration = ""
 
-        if not output_path:
-            tag = str(target).lower().replace(" ", "_")
-            out_p = in_p.parent / f"{in_p.stem}_{tag}.{format.lower()}"
-        else:
-            out_p = Path(output_path).resolve()
-
-        out_p.parent.mkdir(parents=True, exist_ok=True)
-
-        mode, resolved_gpu_id = self.resolve_device(gpu_id)
-        start_time = time.time()
-        used_acceleration = ""
-
-        if mode == "cpu":
-            self._upscale_cpu(in_p, out_p, target_w, target_h, format, progress_callback)
-            used_acceleration = f"CPU Multi-Threaded ({os.cpu_count()} threads, Lanczos-3)"
-        else:
-            is_direct_4x = (target_w == orig_w * 4) and (target_h == orig_h * 4)
-            if is_direct_4x:
-                temp_4x_out = out_p
+            if mode == "cpu":
+                self._upscale_cpu(sanitized_input, out_p, target_w, target_h, format, progress_callback)
+                used_acceleration = f"CPU Multi-Threaded ({os.cpu_count()} threads, Lanczos-3)"
             else:
-                temp_fd, temp_4x_path = tempfile.mkstemp(suffix=".png")
-                os.close(temp_fd)
-                temp_4x_out = Path(temp_4x_path)
+                is_direct_4x = (target_w == orig_w * 4) and (target_h == orig_h * 4)
+                if is_direct_4x:
+                    temp_4x_out = out_p
+                else:
+                    temp_fd, temp_4x_path = tempfile.mkstemp(suffix=".png")
+                    os.close(temp_fd)
+                    temp_4x_out = Path(temp_4x_path)
 
-            cmd = [
-                str(self.binary_path),
-                "-i", str(in_p),
-                "-o", str(temp_4x_out),
-                "-n", model,
-                "-m", str(self.models_dir),
-                "-s", "4",
-                "-t", str(tile_size),
-                "-g", str(resolved_gpu_id),
-                "-f", "png",
-                "-v",
-            ]
-            if tta:
-                cmd.append("-x")
+                cmd = [
+                    str(self.binary_path),
+                    "-i", str(sanitized_input),
+                    "-o", str(temp_4x_out),
+                    "-n", model,
+                    "-m", str(self.models_dir),
+                    "-s", "4",
+                    "-t", str(tile_size),
+                    "-g", str(resolved_gpu_id),
+                    "-f", "png",
+                    "-v",
+                ]
+                if tta:
+                    cmd.append("-x")
 
-            vulkan_success = False
-            try:
-                proc = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    universal_newlines=True,
-                    bufsize=1,
-                )
-
-                pct_pattern = re.compile(r"(\d+(?:\.\d+)?)%")
-                while True:
-                    line = proc.stdout.readline()
-                    if not line and proc.poll() is not None:
-                        break
-                    line = line.strip()
-                    if line:
-                        m = pct_pattern.search(line)
-                        if m and progress_callback:
-                            pct = float(m.group(1))
-                            progress_callback(pct)
-
-                rc = proc.wait()
-                if rc == 0 and temp_4x_out.exists():
-                    vulkan_success = True
-                    used_acceleration = f"Vulkan GPU (Device {resolved_gpu_id})"
-                    if not is_direct_4x:
-                        with Image.open(temp_4x_out) as super_img:
-                            downscaled = super_img.resize((target_w, target_h), Image.Resampling.LANCZOS)
-                            downscaled.save(out_p, format=format.upper())
-            except Exception:
                 vulkan_success = False
-            finally:
-                if not is_direct_4x and temp_4x_out.exists():
-                    try:
-                        temp_4x_out.unlink()
-                    except OSError:
-                        pass
+                try:
+                    proc = subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        universal_newlines=True,
+                        bufsize=1,
+                    )
 
-            if not vulkan_success or not out_p.exists():
-                self._upscale_cpu(in_p, out_p, target_w, target_h, format, progress_callback)
-                used_acceleration = "CPU Multi-Threaded (Vulkan GPU Fallback)"
+                    pct_pattern = re.compile(r"(\d+(?:\.\d+)?)%")
+                    while True:
+                        line = proc.stdout.readline()
+                        if not line and proc.poll() is not None:
+                            break
+                        line = line.strip()
+                        if line:
+                            m = pct_pattern.search(line)
+                            if m and progress_callback:
+                                pct = float(m.group(1))
+                                progress_callback(pct)
 
-        duration = round(time.time() - start_time, 2)
-        out_size = out_p.stat().st_size
+                    rc = proc.wait()
+                    if rc == 0 and temp_4x_out.exists():
+                        vulkan_success = True
+                        used_acceleration = f"Vulkan GPU (Device {resolved_gpu_id})"
+                        if not is_direct_4x:
+                            with Image.open(temp_4x_out) as super_img:
+                                downscaled = super_img.resize((target_w, target_h), Image.Resampling.LANCZOS)
+                                downscaled.save(out_p, format=format.upper())
+                except Exception:
+                    vulkan_success = False
+                finally:
+                    if not is_direct_4x and temp_4x_out.exists():
+                        try:
+                            temp_4x_out.unlink()
+                        except OSError:
+                            pass
 
-        return {
-            "success": True,
-            "input_file": str(in_p),
-            "output_file": str(out_p),
-            "original_resolution": f"{orig_w}x{orig_h}",
-            "output_resolution": f"{target_w}x{target_h}",
-            "original_megapixels": format_megapixels(orig_w, orig_h),
-            "output_megapixels": format_megapixels(target_w, target_h),
-            "target_spec": target_desc,
-            "model_used": model,
-            "tile_size": tile_size,
-            "acceleration": used_acceleration,
-            "gpu_id": resolved_gpu_id if mode == "vulkan" else "cpu",
-            "file_size_bytes": out_size,
-            "file_size_str": format_bytes(out_size),
-            "processing_seconds": duration,
-        }
+                if not vulkan_success or not out_p.exists():
+                    self._upscale_cpu(sanitized_input, out_p, target_w, target_h, format, progress_callback)
+                    used_acceleration = "CPU Multi-Threaded (Vulkan GPU Fallback)"
+
+            duration = round(time.time() - start_time, 2)
+            out_size = out_p.stat().st_size
+
+            return {
+                "success": True,
+                "input_file": str(orig_in_p),
+                "output_file": str(out_p),
+                "original_resolution": f"{orig_w}x{orig_h}",
+                "output_resolution": f"{target_w}x{target_h}",
+                "original_megapixels": format_megapixels(orig_w, orig_h),
+                "output_megapixels": format_megapixels(target_w, target_h),
+                "target_spec": target_desc,
+                "model_used": model,
+                "tile_size": tile_size,
+                "acceleration": used_acceleration,
+                "gpu_id": resolved_gpu_id if mode == "vulkan" else "cpu",
+                "file_size_bytes": out_size,
+                "file_size_str": format_bytes(out_size),
+                "processing_seconds": duration,
+            }
+        finally:
+            if was_temp_input and sanitized_input.exists():
+                try:
+                    sanitized_input.unlink()
+                except OSError:
+                    pass
 
     def get_system_diagnostics(self) -> Dict[str, Any]:
         """Returns cross-platform environment diagnostics and detected hardware."""

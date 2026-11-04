@@ -55,16 +55,25 @@ def upscale_image(
     Returns:
         Dictionary containing upscale metrics, output path, final resolution, acceleration mode, and duration.
     """
-    engine = get_engine()
-    return engine.upscale(
-        input_path=image_path,
-        output_path=output_path,
-        target=target,
-        model=model,
-        tile_size=tile_size,
-        gpu_id=gpu_id,
-        tta=tta,
-    )
+    try:
+        engine = get_engine()
+        return engine.upscale(
+            input_path=image_path,
+            output_path=output_path,
+            target=target,
+            model=model,
+            tile_size=tile_size,
+            gpu_id=gpu_id,
+            tta=tta,
+        )
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "image_path": image_path,
+            "solution": "Verify file exists, check available models via 'list_available_models', or use '--gpu-id cpu'.",
+        }
 
 @mcp.tool()
 def recommend_model(image_path: str, priority: str = "balanced") -> Dict[str, Any]:
@@ -79,8 +88,17 @@ def recommend_model(image_path: str, priority: str = "balanced") -> Dict[str, An
     Returns:
         Dictionary containing recommended model, target preset, tile size, reasoning, and ready CLI command.
     """
-    engine = get_engine()
-    return engine.recommend_model(image_path, priority=priority)
+    try:
+        engine = get_engine()
+        return engine.recommend_model(image_path, priority=priority)
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "image_path": image_path,
+            "solution": "Ensure the path points to a readable image file.",
+        }
 
 @mcp.tool()
 def download_model(model_id: str) -> Dict[str, Any]:
@@ -94,8 +112,17 @@ def download_model(model_id: str) -> Dict[str, Any]:
     Returns:
         Status dictionary with download confirmation, file size, and target path.
     """
-    engine = get_engine()
-    return engine.download_model(model_id)
+    try:
+        engine = get_engine()
+        return engine.download_model(model_id)
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "model_id": model_id,
+            "solution": "Call 'list_available_models' to inspect available models in catalog.",
+        }
 
 @mcp.tool()
 def get_image_metadata(image_path: str) -> Dict[str, Any]:
@@ -109,8 +136,16 @@ def get_image_metadata(image_path: str) -> Dict[str, Any]:
     Returns:
         Dictionary with image properties and print dimensions.
     """
-    engine = get_engine()
-    return engine.get_image_metadata(image_path)
+    try:
+        engine = get_engine()
+        return engine.get_image_metadata(image_path)
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "image_path": image_path,
+        }
 
 @mcp.tool()
 def list_available_models() -> List[Dict[str, Any]]:
@@ -121,8 +156,11 @@ def list_available_models() -> List[Dict[str, Any]]:
     Returns:
         List of model dictionaries.
     """
-    engine = get_engine()
-    return engine.list_models()
+    try:
+        engine = get_engine()
+        return engine.list_models()
+    except Exception as e:
+        return [{"error": str(e)}]
 
 @mcp.tool()
 def get_system_diagnostics() -> Dict[str, Any]:
@@ -133,8 +171,11 @@ def get_system_diagnostics() -> Dict[str, Any]:
     Returns:
         Hardware diagnostics dictionary.
     """
-    engine = get_engine()
-    return engine.get_system_diagnostics()
+    try:
+        engine = get_engine()
+        return engine.get_system_diagnostics()
+    except Exception as e:
+        return {"error": str(e)}
 
 @mcp.tool()
 def calculate_print_dpi(
@@ -154,35 +195,43 @@ def calculate_print_dpi(
     Returns:
         DPI analysis, quality rating, and recommended upscale factor.
     """
-    engine = get_engine()
-    meta = engine.get_image_metadata(image_path)
-    w, h = meta["width"], meta["height"]
+    try:
+        engine = get_engine()
+        meta = engine.get_image_metadata(image_path)
+        w, h = meta["width"], meta["height"]
 
-    dpi_x = w / print_width_inches if print_width_inches > 0 else 0
-    dpi_y = h / print_height_inches if print_height_inches > 0 else 0
-    effective_dpi = round(min(dpi_x, dpi_y), 1)
+        dpi_x = w / print_width_inches if print_width_inches > 0 else 0
+        dpi_y = h / print_height_inches if print_height_inches > 0 else 0
+        effective_dpi = round(min(dpi_x, dpi_y), 1)
 
-    if effective_dpi >= 300:
-        quality = "Excellent (Gallery / Fine Art Quality: >=300 DPI)"
-        recommendation = "No upscaling necessary for this print size."
-    elif effective_dpi >= 200:
-        quality = "Good (Standard Commercial Print: 200-299 DPI)"
-        recommendation = "Upscaling to 8K or 2x recommended for fine text and sharp lines."
-    elif effective_dpi >= 150:
-        quality = "Fair (Acceptable viewing distance print: 150-199 DPI)"
-        recommendation = "Upscaling to 8K or 16K strongly recommended for sharp print detail."
-    else:
-        quality = "Poor (Pixelated / Low Resolution: <150 DPI)"
-        recommendation = "Upscaling to 16K (4x) required to avoid visible pixelation and blurring."
+        if effective_dpi >= 300:
+            quality = "Excellent (Gallery / Fine Art Quality: >=300 DPI)"
+            recommendation = "No upscaling necessary for this print size."
+        elif effective_dpi >= 200:
+            quality = "Good (Standard Commercial Print: 200-299 DPI)"
+            recommendation = "Upscaling to 8K or 2x recommended for fine text and sharp lines."
+        elif effective_dpi >= 150:
+            quality = "Fair (Acceptable viewing distance print: 150-199 DPI)"
+            recommendation = "Upscaling to 8K or 16K strongly recommended for sharp print detail."
+        else:
+            quality = "Poor (Pixelated / Low Resolution: <150 DPI)"
+            recommendation = "Upscaling to 16K (4x) required to avoid visible pixelation and blurring."
 
-    return {
-        "image_path": str(image_path),
-        "current_resolution": f"{w}x{h}",
-        "print_size_inches": f"{print_width_inches} x {print_height_inches}",
-        "effective_dpi": effective_dpi,
-        "quality_rating": quality,
-        "recommendation": recommendation,
-    }
+        return {
+            "success": True,
+            "image_path": str(image_path),
+            "current_resolution": f"{w}x{h}",
+            "print_size_inches": f"{print_width_inches} x {print_height_inches}",
+            "effective_dpi": effective_dpi,
+            "quality_rating": quality,
+            "recommendation": recommendation,
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "image_path": image_path,
+        }
 
 def main():
     """Run MCP server via stdio transport."""

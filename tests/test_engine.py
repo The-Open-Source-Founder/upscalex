@@ -1,5 +1,6 @@
 """
-Unit and integration tests for UpscaleX engine with GPU, CPU, recommendation, and catalog verification.
+Unit and integration tests for UpscaleX engine with GPU, CPU, recommendation,
+and edge-case error recovery verification.
 """
 
 import tempfile
@@ -16,7 +17,6 @@ def sample_image():
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
         img_path = Path(f.name)
     
-    # Create a 64x64 test image with gradient
     img = Image.new("RGB", (64, 64), color=(120, 40, 200))
     img.save(img_path)
     yield img_path
@@ -51,6 +51,14 @@ def test_calculate_target_dimensions():
     assert w == 1000
     assert h == 2000
 
+def test_invalid_target_dimensions():
+    engine = RealESRGANEngine(auto_download=False)
+    with pytest.raises(ValueError, match="Unknown target resolution"):
+        engine.calculate_target_dimensions(100, 100, "invalid_target")
+
+    with pytest.raises(ValueError):
+        engine.calculate_target_dimensions(0, 100, "16k")
+
 def test_get_image_metadata(sample_image):
     engine = RealESRGANEngine(auto_download=False)
     meta = engine.get_image_metadata(sample_image)
@@ -60,6 +68,42 @@ def test_get_image_metadata(sample_image):
     assert meta["aspect_ratio"] == 1.0
     assert meta["mode"] == "RGB"
     assert "print_size_300dpi_inches" in meta
+
+def test_nonexistent_file():
+    engine = RealESRGANEngine(auto_download=False)
+    with pytest.raises(FileNotFoundError):
+        engine.get_image_metadata("non_existent_image_12345.png")
+
+def test_empty_corrupted_file():
+    engine = RealESRGANEngine(auto_download=False)
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+        empty_path = Path(f.name)
+    try:
+        with pytest.raises(ValueError, match="empty"):
+            engine.validate_and_sanitize_input(empty_path)
+    finally:
+        if empty_path.exists():
+            empty_path.unlink()
+
+def test_cmyk_sanitization():
+    """Verifies that print CMYK files are auto-sanitized to RGB."""
+    engine = RealESRGANEngine(auto_download=False)
+    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+        cmyk_path = Path(f.name)
+    try:
+        im = Image.new("CMYK", (32, 32), (0, 100, 100, 0))
+        im.save(cmyk_path)
+
+        sanitized_p, was_temp, w, h = engine.validate_and_sanitize_input(cmyk_path)
+        assert was_temp is True
+        assert sanitized_p.exists()
+        with Image.open(sanitized_p) as test_im:
+            assert test_im.mode in ("RGB", "RGBA")
+        if sanitized_p.exists():
+            sanitized_p.unlink()
+    finally:
+        if cmyk_path.exists():
+            cmyk_path.unlink()
 
 def test_system_diagnostics():
     engine = RealESRGANEngine(auto_download=False)
