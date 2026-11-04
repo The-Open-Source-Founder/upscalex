@@ -13,11 +13,15 @@ UpscaleX is a production-grade 8K and 16K image upscaler CLI and Model Context P
 
 Engineered for digital print workflows, large-format poster production, fine art reproductions, and autonomous AI coding agents in Claude Desktop, Antigravity, and Cursor.
 
+> Looking for quick setup? Read the [Installation Guide](INSTALLATION.md) for a copy-paste AI Agent setup prompt and manual instructions, or provide your AI coding assistant with the [UpscaleX Agent Skill](SKILLS.md).
+
 ---
 
 ## Table of Contents
 
 - [Key Features](#key-features)
+- [Installation Guide](INSTALLATION.md)
+- [AI Agent Skill](SKILLS.md)
 - [Visual Quality Comparison](#visual-quality-comparison)
 - [Documentation Directory](#documentation-directory)
 - [Quickstart with uv](#quickstart-with-uv)
@@ -65,8 +69,10 @@ Below is an empirical comparison demonstrating UpscaleX 4x super-resolution reco
 
 ## Documentation Directory
 
-Comprehensive technical guides are available in the [`docs/`](docs/) directory:
+Comprehensive technical guides are available in the [`docs/`](docs/) directory and repository root:
 
+- [Installation Guide](INSTALLATION.md): AI Agent autonomous copy-paste prompt and manual installation procedures.
+- [AI Agent Skill Specification](SKILLS.md): Standard agent skill definition for Claude, Cursor, and Antigravity.
 - [CLI Reference Guide](docs/cli-guide.md): Complete flag documentation, tiling strategies, and execution examples.
 - [Model Context Protocol (MCP) Guide](docs/mcp-guide.md): JSON-RPC tool contracts, parameter schemas, and multi-client configuration.
 - [Architecture & Mathematics Specification](docs/architecture.md): Deep-learning foundations, RRDB networks, Lanczos kernels, and memory bounds.
