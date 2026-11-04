@@ -7,7 +7,7 @@ from PIL import Image
 import tempfile
 from pathlib import Path
 
-from realesrgan_upscaler.cli import main
+from upscalex.cli import main
 
 def test_cli_models():
     runner = CliRunner()

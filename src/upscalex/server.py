@@ -1,5 +1,5 @@
 """
-Model Context Protocol (MCP) server for RealESRGAN Ultra-High-Resolution Image Upscaling.
+Model Context Protocol (MCP) server for UpscaleX Ultra-High-Resolution Image Upscaling.
 Integrates directly with Claude Desktop, Antigravity, Cursor, and any MCP client.
 """
 
@@ -15,7 +15,7 @@ from fastmcp import FastMCP
 from .engine import RealESRGANEngine
 
 # Initialize the FastMCP server instance
-mcp = FastMCP("RealESRGAN Upscaler")
+mcp = FastMCP("UpscaleX")
 
 _engine_instance: Optional[RealESRGANEngine] = None
 

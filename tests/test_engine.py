@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from realesrgan_upscaler.engine import RealESRGANEngine, AVAILABLE_MODELS
-from realesrgan_upscaler.utils import format_bytes, format_megapixels
+from upscalex.engine import RealESRGANEngine, AVAILABLE_MODELS
+from upscalex.utils import format_bytes, format_megapixels
 
 @pytest.fixture
 def sample_image():

@@ -1,5 +1,5 @@
 """
-RealESRGAN Upscaler MCP & CLI
+UpscaleX MCP/CLI
 High-performance 8K/16K image upscaling with Vulkan GPU acceleration and Model Context Protocol.
 """
 

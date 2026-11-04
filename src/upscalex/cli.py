@@ -1,5 +1,5 @@
 """
-Rich interactive CLI interface for RealESRGAN image upscaling and MCP management.
+Rich interactive CLI interface for UpscaleX image upscaling and MCP management.
 """
 
 from __future__ import annotations
@@ -21,9 +21,9 @@ from .utils import download_and_extract_engine
 console = Console()
 
 @click.group()
-@click.version_option(package_name="realesrgan-upscaler-mcp")
+@click.version_option(package_name="upscalex")
 def main():
-    """RealESRGAN 8K/16K Upscaler CLI & Model Context Protocol (MCP) Server."""
+    """UpscaleX MCP/CLI: Production-grade 8K/16K RealESRGAN Image Upscaler & MCP Server."""
     pass
 
 @main.command()
@@ -68,7 +68,7 @@ def upscale(
             f"[bold cyan]Original Resolution:[/bold cyan] {meta['width']} × {meta['height']} ({meta['megapixels_str']})\n"
             f"[bold cyan]Target Mode:[/bold cyan] [bold green]{target.upper()}[/bold green]\n"
             f"[bold cyan]Model:[/bold cyan] {model} | [bold cyan]GPU ID:[/bold cyan] {gpu_id} | [bold cyan]Tile Size:[/bold cyan] {tile_size}px",
-            title="[bold yellow]RealESRGAN Upscaler[/bold yellow]",
+            title="[bold yellow]UpscaleX CLI[/bold yellow]",
             border_style="cyan",
         )
     )
@@ -205,7 +205,7 @@ def download_engine():
 @main.command()
 def serve():
     """Start the Model Context Protocol (MCP) server over standard I/O."""
-    console.print("[bold green]Starting RealESRGAN MCP Server on stdio...[/bold green]", file=sys.stderr)
+    console.print("[bold green]Starting UpscaleX MCP Server on stdio...[/bold green]", file=sys.stderr)
     mcp.run()
 
 if __name__ == "__main__":

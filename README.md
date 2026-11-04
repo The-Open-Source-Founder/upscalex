@@ -1,11 +1,11 @@
-# RealESRGAN Ultra Upscaler MCP & CLI 🚀
+# UpscaleX MCP/CLI 🚀
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python: 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![MCP: Enabled](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io)
 [![Vulkan GPU](https://img.shields.io/badge/Acceleration-Vulkan%20GPU-orange.svg)](https://www.khronos.org/vulkan/)
 
-Production-grade **8K and 16K image upscaler**, **CLI tool**, and **Model Context Protocol (MCP) server** powered by **RealESRGAN**, **Vulkan GPU hardware acceleration**, and **Lanczos supersampling**.
+**UpscaleX MCP/CLI** is a production-grade **8K/16K image upscaler CLI** and **Model Context Protocol (MCP) server** powered by **RealESRGAN**, **Vulkan GPU hardware acceleration**, and **Lanczos supersampling**.
 
 Designed for high-end digital print shops, poster production, gallery artwork, and autonomous AI agents in Claude Desktop, Antigravity, and Cursor.
 
@@ -13,7 +13,7 @@ Designed for high-end digital print shops, poster production, gallery artwork, a
 
 ## ✨ Features
 
-- 🖥️ **Dual Interface**: Full-featured interactive CLI and standard Model Context Protocol (MCP) server.
+- 🖥️ **Dual Interface**: Full-featured interactive CLI (`upscalex`) and standard Model Context Protocol server (`upscalex-mcp`).
 - 🎯 **8K & 16K Ultra-Resolution Presets**:
   - **16K**: Native 4× RealESRGAN deep-learning model upscale (up to 400+ Megapixels).
   - **8K**: 4× deep-learning upscale downscaled via high-precision Lanczos resampling (SSAA supersampling antialiasing) for razor-sharp lines and zero noise.
@@ -33,8 +33,8 @@ Designed for high-end digital print shops, poster production, gallery artwork, a
 Clone the repository and install with [`uv`](https://github.com/astral-sh/uv):
 
 ```bash
-git clone https://github.com/your-username/realesrgan-upscaler-mcp.git
-cd realesrgan-upscaler-mcp
+git clone https://github.com/your-username/upscalex.git
+cd upscalex
 
 # Create environment and install
 uv venv
@@ -44,7 +44,7 @@ uv pip install -e .
 ### 2. Verify Available Models & Engine
 
 ```bash
-realesrgan-upscaler models
+upscalex models
 ```
 
 ---
@@ -53,22 +53,22 @@ realesrgan-upscaler models
 
 ### Upscale an Image to 16K (Default)
 ```bash
-realesrgan-upscaler upscale input.png --target 16k
+upscalex upscale input.png --target 16k
 ```
 
 ### Upscale an Image to 8K (Supersampled)
 ```bash
-realesrgan-upscaler upscale poster.png --target 8k -o poster_8k.png
+upscalex upscale poster.png --target 8k -o poster_8k.png
 ```
 
 ### Upscale Anime / Digital Illustrations
 ```bash
-realesrgan-upscaler upscale artwork.png --model realesrgan-x4plus-anime --target 8k
+upscalex upscale artwork.png --model realesrgan-x4plus-anime --target 8k
 ```
 
 ### Inspect Image & Print Sizing at 300 DPI
 ```bash
-realesrgan-upscaler info client_poster.png
+upscalex info client_poster.png
 ```
 
 ### CLI Command Options
@@ -90,9 +90,9 @@ Run as a native MCP server to allow AI assistants (Claude, Antigravity, Cursor) 
 
 ### Start MCP Server manually
 ```bash
-realesrgan-mcp
+upscalex-mcp
 # or
-realesrgan-upscaler serve
+upscalex serve
 ```
 
 ### Claude Desktop Configuration
@@ -102,13 +102,13 @@ Add this to your `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "realesrgan-upscaler": {
+    "upscalex": {
       "command": "uv",
       "args": [
         "run",
         "--directory",
-        "/path/to/realesrgan-upscaler-mcp",
-        "realesrgan-mcp"
+        "/path/to/upscalex",
+        "upscalex-mcp"
       ]
     }
   }
@@ -122,13 +122,13 @@ Add this to your `.gemini/settings.json` or `.cursor/mcp.json`:
 ```json
 {
   "mcpServers": {
-    "realesrgan-upscaler": {
+    "upscalex": {
       "command": "uv",
       "args": [
         "run",
         "--directory",
-        "C:\\Companies\\printing_businesses\\custom_orders\\realesrgan-upscaler-mcp",
-        "realesrgan-mcp"
+        "C:\\Companies\\printing_businesses\\custom_orders\\upscalex",
+        "upscalex-mcp"
       ]
     }
   }

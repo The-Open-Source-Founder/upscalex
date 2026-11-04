@@ -3,16 +3,16 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "realesrgan-upscaler-mcp"
+name = "upscalex"
 version = "0.1.0"
-description = "Production-grade 8K/16K RealESRGAN image upscaler CLI and Model Context Protocol (MCP) server with Vulkan GPU acceleration and Lanczos supersampling."
+description = "UpscaleX MCP/CLI: Production-grade 8K/16K image upscaler CLI and Model Context Protocol (MCP) server powered by RealESRGAN, Vulkan GPU acceleration, and Lanczos supersampling."
 readme = "README.md"
 authors = [
     { name = "Arunmozhi Varman", email = "arunmozhi@example.com" }
 ]
 license = { text = "MIT" }
 requires-python = ">=3.10"
-keywords = ["realesrgan", "mcp", "upscale", "super-resolution", "ai", "image-processing", "cli", "16k", "8k", "vulkan"]
+keywords = ["upscalex", "realesrgan", "mcp", "upscale", "super-resolution", "ai", "image-processing", "cli", "16k", "8k", "vulkan"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -39,8 +39,8 @@ dev = [
 ]
 
 [project.scripts]
-realesrgan-upscaler = "realesrgan_upscaler.cli:main"
-realesrgan-mcp = "realesrgan_upscaler.server:main"
+upscalex = "upscalex.cli:main"
+upscalex-mcp = "upscalex.server:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/realesrgan_upscaler"]
+packages = ["src/upscalex"]
