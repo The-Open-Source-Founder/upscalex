@@ -1,5 +1,6 @@
 """
-Core UpscaleX execution engine, resolution planner, cross-platform hardware resolver, and metadata inspector.
+Core UpscaleX execution engine, resolution planner, cross-platform hardware resolver,
+model catalog, and dynamic recommendation system.
 """
 
 from __future__ import annotations
@@ -12,10 +13,11 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.request
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageStat
 
 # Disable PIL's DecompressionBomb check for ultra-large multi-gigapixel print renders
 Image.MAX_IMAGE_PIXELS = None
@@ -30,38 +32,107 @@ from .utils import (
     probe_vulkan_gpus,
 )
 
-AVAILABLE_MODELS = {
+# Comprehensive catalog of pre-packaged and downloadable open-weight models
+MODEL_CATALOG = {
     "realesrgan-x4plus": {
+        "name": "RealESRGAN X4plus",
         "scale": 4,
-        "type": "General / Photos",
-        "description": "Default model for real-world photos, fine art, and high-detail print media.",
+        "type": "Photos / Fine Art",
+        "vram_tier": "Medium (4GB VRAM)",
+        "min_vram_gb": 4,
+        "files": ["realesrgan-x4plus.bin", "realesrgan-x4plus.param"],
+        "download_url": None,
+        "description": "Default flagship model for real-world photos, fine art, architectural renders, and poster prints.",
     },
     "realesrgan-x4plus-anime": {
+        "name": "RealESRGAN Anime",
         "scale": 4,
-        "type": "Anime / Illustration",
-        "description": "Optimized for 2D illustration, anime art, vectors, and line-drawn graphics.",
+        "type": "Anime / 2D Illustration",
+        "vram_tier": "Medium (4GB VRAM)",
+        "min_vram_gb": 4,
+        "files": ["realesrgan-x4plus-anime.bin", "realesrgan-x4plus-anime.param"],
+        "download_url": None,
+        "description": "Optimized for 2D illustrations, anime art, vectors, and digital painting with crisp edge lines.",
+    },
+    "realesr-animevideov3-x4": {
+        "name": "RealESRGAN Fast Video 4x",
+        "scale": 4,
+        "type": "Fast / Low VRAM",
+        "vram_tier": "Low (1GB-2GB VRAM / CPU)",
+        "min_vram_gb": 1,
+        "files": ["realesr-animevideov3-x4.bin", "realesr-animevideov3-x4.param"],
+        "download_url": None,
+        "description": "Lightweight 4x feed-forward model designed for rapid processing and low VRAM GPUs.",
     },
     "realesr-animevideov3-x2": {
         "scale": 2,
-        "type": "Anime Video / 2x",
-        "description": "Fast 2x upscale model for video frames and lightweight 2D assets.",
+        "name": "RealESRGAN Fast Video 2x",
+        "type": "Fast / Low VRAM",
+        "vram_tier": "Low (1GB-2GB VRAM / CPU)",
+        "min_vram_gb": 1,
+        "files": ["realesr-animevideov3-x2.bin", "realesr-animevideov3-x2.param"],
+        "download_url": None,
+        "description": "Fast 2x upscale model for video frames, small assets, and lightweight turnaround.",
     },
     "realesr-animevideov3-x3": {
         "scale": 3,
-        "type": "Anime Video / 3x",
-        "description": "Fast 3x upscale model for video frames and lightweight 2D assets.",
+        "name": "RealESRGAN Fast Video 3x",
+        "type": "Fast / Low VRAM",
+        "vram_tier": "Low (1GB-2GB VRAM / CPU)",
+        "min_vram_gb": 1,
+        "files": ["realesr-animevideov3-x3.bin", "realesr-animevideov3-x3.param"],
+        "download_url": None,
+        "description": "Fast 3x upscale model for video frames, web assets, and rapid turnaround.",
     },
-    "realesr-animevideov3-x4": {
+    "realesr-general-x4v3": {
+        "name": "RealESRGAN General v3 Compact",
         "scale": 4,
-        "type": "Anime Video / 4x",
-        "description": "Fast 4x upscale model for video frames and lightweight 2D assets.",
+        "type": "General / Compact",
+        "vram_tier": "Low (2GB VRAM)",
+        "min_vram_gb": 2,
+        "files": ["realesr-general-x4v3.pth"],
+        "download_url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth",
+        "description": "Official compact general 4x model optimized for quick inference and lower memory consumption.",
+    },
+    "4x-ultrasharp": {
+        "name": "4x UltraSharp (Community Edition)",
+        "scale": 4,
+        "type": "Portraits / Ultra-Detail",
+        "vram_tier": "Medium-High (4GB-6GB VRAM)",
+        "min_vram_gb": 4,
+        "files": ["4x-UltraSharp.pth"],
+        "download_url": "https://huggingface.co/lokcx/4x-Ultrasharp/resolve/main/4x-UltraSharp.pth",
+        "description": "Community champion ESRGAN model famous for razor-sharp portraits, fabric, skin, and micro-textures.",
+    },
+    "4x-nmkd-superscale": {
+        "name": "4x NMKD Superscale",
+        "scale": 4,
+        "type": "Clean Photorealistic",
+        "vram_tier": "Medium-High (4GB-6GB VRAM)",
+        "min_vram_gb": 4,
+        "files": ["4x_NMKD-Superscale-SP_178000_G.pth"],
+        "download_url": "https://huggingface.co/uwg/upscaler/resolve/main/ESRGAN/4x_NMKD-Superscale-SP_178000_G.pth",
+        "description": "Trained on clean photographs; preserves fine hair, clothing threads, and foliage without artifacts.",
+    },
+    "realesrgan-anime-6b": {
+        "name": "RealESRGAN Anime 6-Block Lightweight",
+        "scale": 4,
+        "type": "Anime / Fast",
+        "vram_tier": "Low (1GB-2GB VRAM / CPU)",
+        "min_vram_gb": 1,
+        "files": ["RealESRGAN_x4plus_anime_6B.pth"],
+        "download_url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth",
+        "description": "Lightweight 6-block architecture for fast anime inference with low compute overhead.",
     },
 }
+
+# Legacy alias dictionary for backward compatibility
+AVAILABLE_MODELS = {k: {"scale": v["scale"], "type": v["type"], "description": v["description"]} for k, v in MODEL_CATALOG.items()}
 
 class RealESRGANEngine:
     """
     Manages RealESRGAN binary execution, cross-platform hardware resolution (Vulkan GPU vs CPU),
-    dynamic tile sizing, and resolution supersampling.
+    dynamic model downloading, model recommendation, and resolution supersampling.
     """
 
     def __init__(
@@ -77,7 +148,6 @@ class RealESRGANEngine:
         self, custom_path: Optional[Union[str, Path]], auto_download: bool = True
     ) -> Path:
         """Finds or downloads the RealESRGAN binary."""
-        # 1. Custom provided path
         if custom_path:
             p = Path(custom_path)
             if p.is_file() and os.access(p, os.X_OK):
@@ -87,14 +157,12 @@ class RealESRGANEngine:
                 if cand.exists():
                     return cand.resolve()
 
-        # 2. Environment variable
         env_val = os.environ.get("REALESRGAN_PATH")
         if env_val:
             p = Path(env_val)
             if p.is_file():
                 return p.resolve()
 
-        # 3. Known workspace paths
         common_candidates = [
             Path(r"C:\Companies\printing_businesses\tools\realesrgan") / get_binary_name(),
             get_default_cache_dir() / get_binary_name(),
@@ -105,19 +173,16 @@ class RealESRGANEngine:
             if cand.exists():
                 return cand.resolve()
 
-        # 4. System PATH
         which_path = shutil.which(get_binary_name()) or shutil.which("realesrgan-ncnn-vulkan")
         if which_path:
             return Path(which_path).resolve()
 
-        # 5. Auto download if requested
         if auto_download:
             try:
                 return download_and_extract_engine().resolve()
             except Exception:
                 pass
 
-        # Return a fallback path if download is skipped or unavailable (CPU mode will take over)
         return get_default_cache_dir() / get_binary_name()
 
     def _resolve_models_dir(self, custom_models_dir: Optional[Union[str, Path]]) -> Path:
@@ -127,22 +192,162 @@ class RealESRGANEngine:
             if p.is_dir():
                 return p.resolve()
 
-        # Adjacent to binary
         adjacent = self.binary_path.parent / "models"
         if adjacent.is_dir():
             return adjacent.resolve()
 
-        # Default cache
         cached = get_default_cache_dir() / "models"
         if cached.is_dir():
             return cached.resolve()
 
         return adjacent
 
+    def is_model_installed(self, model_id: str) -> bool:
+        """Checks if all required model weight files exist locally."""
+        if model_id not in MODEL_CATALOG:
+            return False
+        meta = MODEL_CATALOG[model_id]
+        return all((self.models_dir / f).exists() for f in meta["files"])
+
+    def download_model(self, model_id: str, progress_callback: Optional[Callable[[int, int], None]] = None) -> Dict[str, Any]:
+        """
+        Downloads open-weight model files from upstream mirrors directly into the models directory.
+        """
+        if model_id not in MODEL_CATALOG:
+            valid = ", ".join(MODEL_CATALOG.keys())
+            raise ValueError(f"Unknown model '{model_id}'. Catalog models: {valid}")
+
+        meta = MODEL_CATALOG[model_id]
+        if self.is_model_installed(model_id):
+            return {
+                "success": True,
+                "model_id": model_id,
+                "name": meta["name"],
+                "status": "already_installed",
+                "message": f"Model '{meta['name']}' is already installed.",
+                "path": str(self.models_dir),
+            }
+
+        url = meta.get("download_url")
+        if not url:
+            raise RuntimeError(
+                f"Model '{model_id}' is part of the core binary bundle. Run 'upscalex download-engine' to fetch it."
+            )
+
+        self.models_dir.mkdir(parents=True, exist_ok=True)
+        dest_filename = meta["files"][0]
+        dest_path = self.models_dir / dest_filename
+
+        try:
+            def reporthook(block_num, block_size, total_size):
+                if progress_callback and total_size > 0:
+                    progress_callback(block_num * block_size, total_size)
+
+            urllib.request.urlretrieve(url, str(dest_path), reporthook=reporthook)
+
+            return {
+                "success": True,
+                "model_id": model_id,
+                "name": meta["name"],
+                "status": "downloaded",
+                "message": f"Model '{meta['name']}' successfully downloaded.",
+                "file": dest_filename,
+                "path": str(dest_path),
+                "size_bytes": dest_path.stat().st_size,
+                "size_str": format_bytes(dest_path.stat().st_size),
+            }
+        except Exception as e:
+            if dest_path.exists():
+                try:
+                    dest_path.unlink()
+                except OSError:
+                    pass
+            raise RuntimeError(f"Failed to download model '{model_id}' from {url}: {e}")
+
+    def recommend_model(self, image_path: Union[str, Path], priority: str = "balanced") -> Dict[str, Any]:
+        """
+        Inspects host hardware specifications (GPU VRAM, CPU cores) and image characteristics
+        (color variance, entropy, resolution) to recommend the optimal upscaling model and settings.
+        """
+        in_p = Path(image_path).resolve()
+        if not in_p.is_file():
+            raise FileNotFoundError(f"Image not found: {image_path}")
+
+        diag = self.get_system_diagnostics()
+        meta = self.get_image_metadata(in_p)
+
+        # Image content heuristic: analyze color variance & flat region ratio
+        with Image.open(in_p) as img:
+            thumb = img.convert("RGB").resize((128, 128))
+            stat = ImageStat.Stat(thumb)
+            avg_stddev = sum(stat.stddev) / 3.0
+            unique_colors = len(thumb.getcolors(maxcolors=16384) or [])
+
+        # Classification heuristic: low variance / restricted palette -> 2D/Anime/Vector; high variance -> Photo
+        is_illustration = (unique_colors < 6000 and avg_stddev < 60.0) or (unique_colors < 3500)
+        image_class = "2D Illustration / Vector Art / Anime" if is_illustration else "Photographic / Continuous Tone / Fine Art"
+
+        # Hardware evaluation
+        has_gpu = diag["has_vulkan_gpu"]
+        discrete_gpus = [g for g in diag.get("detected_gpus", []) if g.get("is_discrete")]
+        is_discrete = len(discrete_gpus) > 0
+        gpu_name = discrete_gpus[0]["name"] if is_discrete else (diag.get("detected_gpus", [{}])[0].get("name") if has_gpu else "CPU")
+
+        # Determine target resolution preset
+        orig_mp = meta["megapixels"]
+        if orig_mp >= 20.0:
+            rec_target = "16k"
+            target_reason = "Source image is >=20 MP. Native 16K (4x) upscale is ideal for large-format exhibition master prints."
+        elif orig_mp >= 5.0:
+            rec_target = "8k"
+            target_reason = "Source image is 5-20 MP. 8K supersampling (4x + Lanczos) delivers maximum edge clarity with zero noise."
+        else:
+            rec_target = "4k"
+            target_reason = "Source image is low-resolution (<5 MP). 4K target provides clean restoration without over-magnifying artifacts."
+
+        # Select model and settings based on hardware + content
+        if not has_gpu:
+            rec_model = "realesr-animevideov3-x4" if is_illustration else "realesrgan-x4plus"
+            rec_tile = 128
+            hw_tier = "CPU Multi-Threaded"
+            rec_reasoning = f"No discrete GPU detected. Using {rec_model} with 128px tiling for CPU-safe execution."
+        elif not is_discrete:
+            # Integrated GPU (Intel UHD / Iris)
+            rec_model = "realesr-animevideov3-x4" if is_illustration else "realesrgan-x4plus"
+            rec_tile = 128
+            hw_tier = "Integrated GPU (Shared System RAM)"
+            rec_reasoning = f"Integrated GPU detected ({gpu_name}). 128px tiling prevents system memory pressure and driver timeouts."
+        else:
+            # Dedicated GPU (RTX / Radeon)
+            rec_tile = 256
+            hw_tier = f"Dedicated GPU ({gpu_name})"
+            if is_illustration:
+                rec_model = "realesrgan-x4plus-anime"
+                rec_reasoning = f"Detected {image_class} on {gpu_name}. 'realesrgan-x4plus-anime' provides clean contour preservation and flat color smoothing."
+            else:
+                rec_model = "realesrgan-x4plus"
+                rec_reasoning = f"Detected {image_class} on {gpu_name}. 'realesrgan-x4plus' with 256px tiling delivers pristine textural and fine-art fidelity."
+
+        cmd_sample = f'upscalex upscale "{in_p.name}" --target {rec_target} --model {rec_model} --tile-size {rec_tile}'
+
+        return {
+            "image_path": str(in_p),
+            "file_name": in_p.name,
+            "detected_content_type": image_class,
+            "hardware_tier": hw_tier,
+            "recommended_model": rec_model,
+            "recommended_target": rec_target,
+            "recommended_tile_size": rec_tile,
+            "recommended_gpu_id": "auto",
+            "target_resolution_reasoning": target_reason,
+            "model_selection_reasoning": rec_reasoning,
+            "ready_command": cmd_sample,
+            "is_model_installed": self.is_model_installed(rec_model),
+        }
+
     def resolve_device(self, requested_gpu: Optional[Union[int, str]] = "auto") -> Tuple[str, Optional[int]]:
         """
         Determines execution device: 'vulkan' with device ID, or 'cpu'.
-        Auto-detects discrete NVIDIA/AMD/Apple GPUs or falls back gracefully to CPU.
         """
         if isinstance(requested_gpu, str) and requested_gpu.strip().lower() in ("cpu", "-1", "none"):
             return "cpu", None
@@ -178,7 +383,6 @@ class RealESRGANEngine:
         aspect_ratio = width / height if height > 0 else 1.0
         mp = (width * height) / 1_000_000.0
 
-        # Print sizing at standard 300 DPI (high-end photo/poster standard)
         print_width_inches = width / 300.0
         print_height_inches = height / 300.0
         print_width_cm = print_width_inches * 2.54
@@ -206,7 +410,6 @@ class RealESRGANEngine:
     ) -> Tuple[int, int, str]:
         """
         Determines target width and height based on user request.
-        Supports presets: "16k", "8k", "4k", "4x", "2x", or custom "WxH".
         """
         target_clean = str(target).strip().lower()
 
@@ -248,10 +451,7 @@ class RealESRGANEngine:
         format: str,
         progress_callback: Optional[Callable[[float], None]] = None,
     ):
-        """
-        High-performance multi-threaded CPU fallback upscaler.
-        Uses multi-stage Lanczos resampling with adaptive unsharp masking.
-        """
+        """High-performance multi-threaded CPU fallback upscaler."""
         if progress_callback:
             progress_callback(10.0)
 
@@ -260,12 +460,10 @@ class RealESRGANEngine:
             if progress_callback:
                 progress_callback(30.0)
 
-            # High-order Lanczos interpolation
             upscaled = rgb_img.resize((target_w, target_h), Image.Resampling.LANCZOS)
             if progress_callback:
                 progress_callback(70.0)
 
-            # Subtle unsharp mask to restore micro-contrast and eliminate bicubic blur
             sharpened = upscaled.filter(ImageFilter.UnsharpMask(radius=2, percent=120, threshold=3))
             if progress_callback:
                 progress_callback(90.0)
@@ -289,17 +487,23 @@ class RealESRGANEngine:
     ) -> Dict[str, Any]:
         """
         Executes high-resolution upscaling with hardware auto-selection.
-        Runs Vulkan GPU inference when available, with automatic multi-threaded CPU fallback.
         """
         in_p = Path(input_path).resolve()
         if not in_p.is_file():
             raise FileNotFoundError(f"Input image not found: {input_path}")
 
-        if model not in AVAILABLE_MODELS:
-            valid = ", ".join(AVAILABLE_MODELS.keys())
+        if model not in MODEL_CATALOG:
+            valid = ", ".join(MODEL_CATALOG.keys())
             raise ValueError(f"Invalid model '{model}'. Available models: {valid}")
 
-        # Probe original dimensions
+        # Ensure model weights are available
+        if not self.is_model_installed(model):
+            # Auto download if downloadable
+            if MODEL_CATALOG[model].get("download_url"):
+                self.download_model(model)
+            else:
+                raise FileNotFoundError(f"Model weights for '{model}' not found in {self.models_dir}.")
+
         with Image.open(in_p) as img:
             orig_w, orig_h = img.size
 
@@ -321,7 +525,6 @@ class RealESRGANEngine:
             self._upscale_cpu(in_p, out_p, target_w, target_h, format, progress_callback)
             used_acceleration = f"CPU Multi-Threaded ({os.cpu_count()} threads, Lanczos-3)"
         else:
-            # Vulkan GPU Execution
             is_direct_4x = (target_w == orig_w * 4) and (target_h == orig_h * 4)
             if is_direct_4x:
                 temp_4x_out = out_p
@@ -384,7 +587,6 @@ class RealESRGANEngine:
                     except OSError:
                         pass
 
-            # If Vulkan run failed (e.g. missing driver or memory issue), trigger seamless CPU fallback
             if not vulkan_success or not out_p.exists():
                 self._upscale_cpu(in_p, out_p, target_w, target_h, format, progress_callback)
                 used_acceleration = "CPU Multi-Threaded (Vulkan GPU Fallback)"
@@ -414,9 +616,18 @@ class RealESRGANEngine:
         """Returns cross-platform environment diagnostics and detected hardware."""
         return get_system_diagnostics(self.binary_path, self.models_dir)
 
-    def list_models(self) -> List[Dict[str, Union[str, int]]]:
-        """Returns all supported models with descriptions."""
-        return [
-            {"model_id": k, "scale": v["scale"], "type": v["type"], "description": v["description"]}
-            for k, v in AVAILABLE_MODELS.items()
-        ]
+    def list_models(self) -> List[Dict[str, Any]]:
+        """Returns all catalog models with local installation status and specifications."""
+        result = []
+        for k, v in MODEL_CATALOG.items():
+            result.append({
+                "model_id": k,
+                "name": v["name"],
+                "scale": v["scale"],
+                "type": v["type"],
+                "vram_tier": v["vram_tier"],
+                "installed": self.is_model_installed(k),
+                "downloadable": bool(v.get("download_url")),
+                "description": v["description"],
+            })
+        return result

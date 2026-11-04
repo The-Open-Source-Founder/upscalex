@@ -11,9 +11,11 @@ The CLI provides five core subcommands:
 | Subcommand | Function |
 | :--- | :--- |
 | `upscale` | Execute high-resolution image upscaling using RealESRGAN models. |
+| `recommend` | Automatically evaluate image and hardware specs to recommend the optimal model and settings. |
+| `download-model` | Download an open-weight model from the catalog into local storage. |
 | `info` | Inspect pixel dimensions, megapixels, color space, and print sizes at 300 DPI. |
 | `doctor` | Inspect cross-platform environment, detected GPUs, and CPU fallback capabilities. |
-| `models` | List all available pre-trained neural network models and their specifications. |
+| `models` | List all available models, their scale, VRAM requirements, and local status. |
 | `download-engine` | Manually download and verify the precompiled Vulkan binary for your operating system. |
 | `serve` | Run the Model Context Protocol (MCP) server over standard input/output. |
 
@@ -69,7 +71,67 @@ upscalex upscale banner.png --target 12000x8000 --tile-size 400
 
 ---
 
-## 2. VRAM and Tile Size Management
+## 2. `recommend` Command Reference
+
+Analyzes the image's visual entropy (photos vs flat 2D illustrations) and probes host GPU VRAM and CPU threads to recommend the optimal model, resolution target, and tile dimension.
+
+### Syntax
+
+```bash
+upscalex recommend IMAGE_PATH
+```
+
+### Sample Output
+
+```
++------------------- UpscaleX Smart Recommendation Engine --------------------+
+| Input Image: sample.png                                                     |
+| Content Type: Photographic / Continuous Tone / Fine Art                     |
+| Hardware Tier: Dedicated GPU (NVIDIA GeForce RTX 3050 Laptop GPU)           |
+| Recommended Model: realesrgan-x4plus                                        |
+| Recommended Target: 16K                                                      |
+| Recommended Tile Size: 256px                                                |
+|                                                                             |
+| Model Selection Reasoning:                                                  |
+| Detected Photographic art on dedicated GPU. 'realesrgan-x4plus' with         |
+| 256px tiling delivers pristine textural and fine-art fidelity.              |
+|                                                                             |
+| Resolution Reasoning:                                                       |
+| Source image is >=20 MP. Native 16K (4x) upscale is ideal for master prints.|
+|                                                                             |
+| Ready-to-Run Command:                                                       |
+| upscalex upscale "sample.png" --target 16k --model realesrgan-x4plus         |
++-----------------------------------------------------------------------------+
+```
+
+---
+
+## 3. `download-model` Command Reference
+
+Downloads open-weight model files on demand from upstream mirrors into local storage.
+
+### Syntax
+
+```bash
+upscalex download-model MODEL_ID
+```
+
+### Examples
+
+```bash
+# Download 4x UltraSharp (Portraits / Fine details)
+upscalex download-model 4x-ultrasharp
+
+# Download NMKD clean photo model
+upscalex download-model 4x-nmkd-superscale
+
+# Download compact general model
+upscalex download-model realesr-general-x4v3
+```
+
+---
+
+## 4. VRAM and Tile Size Management
 
 RealESRGAN processes images using a sliding-window spatial tile mechanism. Selecting the appropriate `--tile-size` ensures stable execution without exceeding physical GPU memory.
 

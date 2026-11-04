@@ -45,6 +45,19 @@ Upscales an image file to high-resolution targets.
 - `gpu_id` (integer, optional, default `1`): Vulkan device index (`1` for discrete NVIDIA/AMD GPU).
 - `tta` (boolean, optional, default `false`): Enable Test-Time Augmentation (higher quality, 8x longer runtime).
 
+### `recommend_model`
+Inspects host GPU VRAM, CPU threads, and image visual entropy to recommend the ideal model, resolution target, and tile size.
+
+**Parameters:**
+- `image_path` (string, required): Absolute path to the image file to evaluate.
+- `priority` (string, optional, default `"balanced"`): `"balanced"`, `"speed"`, or `"quality"`.
+
+### `download_model`
+Downloads open-weight models on demand from open-source mirrors into local storage.
+
+**Parameters:**
+- `model_id` (string, required): Model identifier (e.g. `'4x-ultrasharp'`, `'4x-nmkd-superscale'`, `'realesr-general-x4v3'`, `'realesrgan-anime-6b'`).
+
 ### `get_image_metadata`
 Inspects image dimensions, color space, file size, and calculated print dimensions at 300 DPI.
 

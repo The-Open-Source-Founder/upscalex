@@ -1,5 +1,5 @@
 """
-Unit and integration tests for UpscaleX engine with GPU and CPU fallback verification.
+Unit and integration tests for UpscaleX engine with GPU, CPU, recommendation, and catalog verification.
 """
 
 import tempfile
@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from upscalex.engine import RealESRGANEngine, AVAILABLE_MODELS
+from upscalex.engine import RealESRGANEngine, MODEL_CATALOG
 from upscalex.utils import format_bytes, format_megapixels
 
 @pytest.fixture
@@ -74,8 +74,18 @@ def test_system_diagnostics():
 def test_list_models():
     engine = RealESRGANEngine(auto_download=False)
     models = engine.list_models()
-    assert len(models) == len(AVAILABLE_MODELS)
+    assert len(models) == len(MODEL_CATALOG)
     assert any(m["model_id"] == "realesrgan-x4plus" for m in models)
+    assert any("installed" in m for m in models)
+
+def test_recommend_model(sample_image):
+    engine = RealESRGANEngine(auto_download=False)
+    rec = engine.recommend_model(sample_image)
+
+    assert "recommended_model" in rec
+    assert "hardware_tier" in rec
+    assert "ready_command" in rec
+    assert "target_resolution_reasoning" in rec
 
 def test_cpu_fallback_upscale(sample_image):
     """Verifies that execution succeeds on CPU-only environments without GPU."""

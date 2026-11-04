@@ -44,8 +44,8 @@ def upscale_image(
         image_path: Absolute or relative path to the source image (PNG, JPG, WEBP).
         target: Target resolution preset ('16k', '8k', '4k', '4x', '2x', or 'WIDTHxHEIGHT').
                 Defaults to '16k' (4x upscale).
-        model: RealESRGAN model ('realesrgan-x4plus' for photorealistic/print media,
-               'realesrgan-x4plus-anime' for 2D art/illustrations).
+        model: RealESRGAN model ID from catalog (e.g. 'realesrgan-x4plus', 'realesrgan-x4plus-anime',
+               '4x-ultrasharp', '4x-nmkd-superscale').
         output_path: Optional path for the upscaled output. If omitted, saves next to source.
         tile_size: GPU tile size in pixels (default 256, safe for 4GB-8GB VRAM).
         gpu_id: Hardware device selection: 'auto' (picks discrete GPU), integer ID ('0', '1'),
@@ -67,6 +67,37 @@ def upscale_image(
     )
 
 @mcp.tool()
+def recommend_model(image_path: str, priority: str = "balanced") -> Dict[str, Any]:
+    """
+    Inspect host GPU specifications, VRAM tier, CPU threads, and image characteristics
+    (photos vs illustrations) to recommend the optimal model, target preset, and tile size.
+
+    Args:
+        image_path: Path to the image file to evaluate.
+        priority: Optimization priority ('balanced', 'speed', 'quality').
+
+    Returns:
+        Dictionary containing recommended model, target preset, tile size, reasoning, and ready CLI command.
+    """
+    engine = get_engine()
+    return engine.recommend_model(image_path, priority=priority)
+
+@mcp.tool()
+def download_model(model_id: str) -> Dict[str, Any]:
+    """
+    Download open-weight model files on demand from upstream mirrors into the local models directory.
+
+    Args:
+        model_id: Identifier of the model to download (e.g. '4x-ultrasharp', '4x-nmkd-superscale',
+                  'realesr-general-x4v3', 'realesrgan-anime-6b').
+
+    Returns:
+        Status dictionary with download confirmation, file size, and target path.
+    """
+    engine = get_engine()
+    return engine.download_model(model_id)
+
+@mcp.tool()
 def get_image_metadata(image_path: str) -> Dict[str, Any]:
     """
     Retrieve comprehensive image metadata including resolution, megapixels,
@@ -84,10 +115,11 @@ def get_image_metadata(image_path: str) -> Dict[str, Any]:
 @mcp.tool()
 def list_available_models() -> List[Dict[str, Any]]:
     """
-    List all supported RealESRGAN models, their scaling factor, and ideal use cases.
+    List all supported models in the catalog with installation status, VRAM requirements,
+    and ideal media targets.
 
     Returns:
-        List of model dictionaries with model_id, scale, and description.
+        List of model dictionaries.
     """
     engine = get_engine()
     return engine.list_models()

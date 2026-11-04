@@ -1,5 +1,5 @@
 """
-Rich interactive CLI interface for UpscaleX image upscaling and MCP management.
+Rich interactive CLI interface for UpscaleX image upscaling, model catalog, and MCP management.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from rich.panel import Panel
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 
-from .engine import AVAILABLE_MODELS, RealESRGANEngine
+from .engine import MODEL_CATALOG, RealESRGANEngine
 from .server import mcp
 from .utils import download_and_extract_engine, get_system_diagnostics
 
@@ -37,8 +37,8 @@ def main():
 @click.option(
     "-m", "--model",
     default="realesrgan-x4plus",
-    type=click.Choice(list(AVAILABLE_MODELS.keys()), case_sensitive=False),
-    help="RealESRGAN model to apply.",
+    type=click.Choice(list(MODEL_CATALOG.keys()), case_sensitive=False),
+    help="Model identifier to apply.",
     show_default=True,
 )
 @click.option("-o", "--output", default=None, help="Output destination file path.")
@@ -119,36 +119,82 @@ def upscale(
 
 @main.command()
 @click.argument("image_path", type=click.Path(exists=True, dir_okay=False))
+def recommend(image_path: str):
+    """Recommend the optimal model, target resolution, and tile size for an image based on system hardware."""
+    try:
+        engine = RealESRGANEngine(auto_download=False)
+        rec = engine.recommend_model(image_path)
+    except Exception as e:
+        console.print(f"[bold red]Recommendation Error:[/bold red] {e}")
+        sys.exit(1)
+
+    console.print(
+        Panel.fit(
+            f"[bold cyan]Input Image:[/bold cyan] {rec['file_name']}\n"
+            f"[bold cyan]Content Type:[/bold cyan] [bold green]{rec['detected_content_type']}[/bold green]\n"
+            f"[bold cyan]Hardware Tier:[/bold cyan] [bold yellow]{rec['hardware_tier']}[/bold yellow]\n"
+            f"[bold cyan]Recommended Model:[/bold cyan] [bold white]{rec['recommended_model']}[/bold white]\n"
+            f"[bold cyan]Recommended Target:[/bold cyan] [bold green]{rec['recommended_target'].upper()}[/bold green]\n"
+            f"[bold cyan]Recommended Tile Size:[/bold cyan] {rec['recommended_tile_size']}px\n\n"
+            f"[bold cyan]Model Selection Reasoning:[/bold cyan]\n{rec['model_selection_reasoning']}\n\n"
+            f"[bold cyan]Resolution Reasoning:[/bold cyan]\n{rec['target_resolution_reasoning']}\n\n"
+            f"[bold cyan]Ready-to-Run Command:[/bold cyan]\n[bold green]{rec['ready_command']}[/bold green]",
+            title="[bold yellow]UpscaleX Smart Recommendation Engine[/bold yellow]",
+            border_style="yellow",
+        )
+    )
+
+@main.command()
+@click.argument("model_id")
+def download_model(model_id: str):
+    """Download an open-weight model from the catalog into local storage."""
+    try:
+        engine = RealESRGANEngine(auto_download=False)
+    except Exception as e:
+        console.print(f"[bold red]Initialization Error:[/bold red] {e}")
+        sys.exit(1)
+
+    if model_id not in MODEL_CATALOG:
+        valid = ", ".join(MODEL_CATALOG.keys())
+        console.print(f"[bold red]Unknown model:[/bold red] {model_id}\n[cyan]Catalog models:[/cyan] {valid}")
+        sys.exit(1)
+
+    meta = MODEL_CATALOG[model_id]
+    console.print(f"[cyan]Downloading model:[/cyan] [bold]{meta['name']}[/bold] ({meta['type']})")
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[bold yellow]{task.percentage:>3.1f}%"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Fetching weights...", total=100.0)
+
+        def cb(downloaded: int, total: int):
+            if total > 0:
+                pct = (downloaded / total) * 100.0
+                progress.update(task, completed=min(pct, 100.0))
+
+        try:
+            res = engine.download_model(model_id, progress_callback=cb)
+            progress.update(task, completed=100.0)
+        except Exception as e:
+            console.print(f"\n[bold red]Download Failed:[/bold red] {e}")
+            sys.exit(1)
+
+    console.print(f"[bold green]{res['message']}[/bold green] ([cyan]{res.get('size_str', 'ready')}[/cyan])")
+
+@main.command()
+@click.argument("image_path", type=click.Path(exists=True, dir_okay=False))
 def info(image_path: str):
     """Inspect image resolution, aspect ratio, file size, and print dimensions at 300 DPI."""
     try:
         engine = RealESRGANEngine(auto_download=False)
-    except Exception:
-        engine = None
-
-    if engine:
         meta = engine.get_image_metadata(image_path)
-    else:
-        from PIL import Image
-        from .utils import format_bytes, format_megapixels
-        p = Path(image_path)
-        with Image.open(p) as img:
-            w, h = img.size
-            mode = img.mode
-            fmt = img.format
-        meta = {
-            "file_name": p.name,
-            "file_path": str(p.resolve()),
-            "width": w,
-            "height": h,
-            "aspect_ratio": round(w / h, 4) if h else 1.0,
-            "megapixels_str": format_megapixels(w, h),
-            "mode": mode,
-            "format": fmt,
-            "file_size_str": format_bytes(p.stat().st_size),
-            "print_size_300dpi_inches": f"{w / 300.0:.1f} x {h / 300.0:.1f} in",
-            "print_size_300dpi_cm": f"{(w / 300.0) * 2.54:.1f} x {(h / 300.0) * 2.54:.1f} cm",
-        }
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] {e}")
+        sys.exit(1)
 
     table = Table(title=f"Image Metadata: {meta['file_name']}", border_style="cyan")
     table.add_column("Field", style="bold")
@@ -198,15 +244,23 @@ def doctor():
 
 @main.command()
 def models():
-    """List all available RealESRGAN pre-trained models."""
-    table = Table(title="Available RealESRGAN Models", border_style="magenta", header_style="bold magenta")
+    """List all supported models with VRAM requirements, target media, and local status."""
+    try:
+        engine = RealESRGANEngine(auto_download=False)
+        model_list = engine.list_models()
+    except Exception:
+        model_list = []
+
+    table = Table(title="UpscaleX Model Catalog & VRAM Requirements", border_style="magenta", header_style="bold magenta")
     table.add_column("Model ID", style="bold cyan")
     table.add_column("Scale", style="green")
     table.add_column("Target Media", style="yellow")
-    table.add_column("Description", style="white")
+    table.add_column("VRAM Requirement", style="white")
+    table.add_column("Status", style="bold")
 
-    for k, v in AVAILABLE_MODELS.items():
-        table.add_row(k, f"{v['scale']}×", v["type"], v["description"])
+    for m in model_list:
+        status_text = "[green]Installed[/green]" if m["installed"] else "[dim yellow]Available for download[/dim yellow]"
+        table.add_row(m["model_id"], f"{m['scale']}×", m["type"], m["vram_tier"], status_text)
 
     console.print(table)
 

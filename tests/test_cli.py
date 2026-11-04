@@ -1,5 +1,5 @@
 """
-Tests for CLI commands including diagnostics.
+Tests for CLI commands including diagnostics and recommendation engine.
 """
 
 from click.testing import CliRunner
@@ -11,9 +11,10 @@ from upscalex.cli import main
 
 def test_cli_models():
     runner = CliRunner()
-    result = runner.invoke(main, ["models"])
+    result = runner.invoke(main, ["models"], env={"COLUMNS": "160"})
     assert result.exit_code == 0
-    assert "realesrgan-x4plus" in result.output
+    assert "Installed" in result.output
+    assert "4x-ultrasharp" in result.output
 
 def test_cli_doctor():
     runner = CliRunner()
@@ -21,6 +22,22 @@ def test_cli_doctor():
     assert result.exit_code == 0
     assert "Operating System" in result.output
     assert "CPU Logical Cores" in result.output
+
+def test_cli_recommend():
+    runner = CliRunner()
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+        p = Path(f.name)
+    try:
+        img = Image.new("RGB", (300, 300), color="green")
+        img.save(p)
+
+        result = runner.invoke(main, ["recommend", str(p)])
+        assert result.exit_code == 0
+        assert "Recommended Model" in result.output
+        assert "Ready-to-Run Command" in result.output
+    finally:
+        if p.exists():
+            p.unlink()
 
 def test_cli_info():
     runner = CliRunner()
@@ -46,3 +63,5 @@ def test_cli_help():
     assert "serve" in result.output
     assert "doctor" in result.output
     assert "models" in result.output
+    assert "recommend" in result.output
+    assert "download-model" in result.output

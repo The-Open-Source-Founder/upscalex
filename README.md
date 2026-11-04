@@ -131,6 +131,12 @@ upscalex upscale graphic.png --model realesrgan-x4plus-anime --target 8k
 upscalex info input.png
 ```
 
+### Hardware and Content-Aware Model Recommendation
+
+```bash
+upscalex recommend input.png
+```
+
 For complete options and arguments, see the [CLI Guide](docs/cli-guide.md).
 
 ---
@@ -171,15 +177,33 @@ Detailed configuration instructions for Claude Desktop, Antigravity, and Cursor 
 
 ---
 
-## Model Matrix
+## Model Matrix and Catalog
 
-| Model ID | Native Scale | Target Media | Application |
-| :--- | :--- | :--- | :--- |
-| `realesrgan-x4plus` | 4x | General / Photography | Default model for real-world photos, fine art, textures, and print posters. |
-| `realesrgan-x4plus-anime` | 4x | Anime / Illustration | Optimized for digital art, vector illustrations, line work, and comics. |
-| `realesr-animevideov3-x2` | 2x | Animation / Video | Rapid 2x turnaround model for video frames and lightweight 2D assets. |
-| `realesr-animevideov3-x3` | 3x | Animation / Video | Rapid 3x turnaround model for video frames and lightweight 2D assets. |
-| `realesr-animevideov3-x4` | 4x | Animation / Video | Rapid 4x turnaround model for video frames and lightweight 2D assets. |
+UpscaleX supports both pre-packaged core models and on-demand downloadable community models:
+
+| Model ID | Scale | Target Media | VRAM Requirement | Status | Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `realesrgan-x4plus` | 4x | Photos / Fine Art | Medium (4GB VRAM) | **Installed** | Flagship model for high-fidelity photography, art, and exhibition posters. |
+| `realesrgan-x4plus-anime` | 4x | Anime / Illustration | Medium (4GB VRAM) | **Installed** | Preserves flat colors, sharp contours, and line definition in 2D illustrations. |
+| `realesr-animevideov3-x4` | 4x | Video / Fast Previews | Low (1GB-2GB / CPU) | **Installed** | Lightweight 4x feed-forward model for fast turnaround and low-spec systems. |
+| `realesr-animevideov3-x2` | 2x | Animation / Video | Low (1GB-2GB / CPU) | **Installed** | Fast 2x model for video frames, icons, and lightweight web assets. |
+| `realesr-animevideov3-x3` | 3x | Animation / Video | Low (1GB-2GB / CPU) | **Installed** | Fast 3x model for intermediate scaling. |
+| `realesr-general-x4v3` | 4x | General / Compact | Low (2GB VRAM) | **Installed** | Official compact general model with low memory consumption. |
+| `4x-ultrasharp` | 4x | Portraits / Ultra-Detail | Medium-High (4GB-6GB) | Downloadable | Community champion for micro-textures, portraits, fabrics, and skin. |
+| `4x-nmkd-superscale` | 4x | Clean Photorealistic | Medium-High (4GB-6GB) | Downloadable | Trained on clean photography; preserves hair, threads, and foliage. |
+| `realesrgan-anime-6b` | 4x | Anime / Fast | Low (1GB-2GB / CPU) | Downloadable | 6-block lightweight anime model for rapid processing. |
+
+### Download Additional Models
+
+Download models through the CLI or via the `download_model` MCP tool:
+
+```bash
+# Download 4x UltraSharp for portraits
+upscalex download-model 4x-ultrasharp
+
+# Download NMKD clean photo model
+upscalex download-model 4x-nmkd-superscale
+```
 
 ---
 

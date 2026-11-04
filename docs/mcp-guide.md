@@ -49,9 +49,14 @@ upscalex serve
 
 ## Exposed MCP Tools
 
-The server registers four primary tools under standard JSON-RPC contracts.
+The server registers six primary tools under standard JSON-RPC contracts:
 
-### 1. `upscale_image`
+1. `upscale_image`: Execute deep-learning upscaling with resolution presets and hardware selection.
+2. `recommend_model`: Analyze image characteristics and host specs to recommend optimal model, target, and tiling.
+3. `download_model`: Download open-weight models on demand from upstream mirrors into local storage.
+4. `get_image_metadata`: Inspect dimensions, aspect ratio, megapixels, color space, and 300 DPI print measurements.
+5. `list_available_models`: Inspect model catalog, VRAM tiers, and local installation status.
+6. `calculate_print_dpi`: Calculate effective DPI and suitability for specific poster/canvas print dimensions.
 
 Executes deep-learning upscaling on an input image file.
 
@@ -90,7 +95,64 @@ Executes deep-learning upscaling on an input image file.
 
 ---
 
-### 2. `get_image_metadata`
+### 2. `recommend_model`
+
+Evaluates host GPU VRAM, CPU cores, image resolution, and visual entropy (photos vs 2D illustrations) to recommend the optimal model, resolution target, and tile size.
+
+#### Parameters
+
+| Name | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `image_path` | `string` | Yes | — | Absolute or relative path to the image file. |
+| `priority` | `string` | No | `"balanced"` | Optimization priority: `"balanced"`, `"speed"`, or `"quality"`. |
+
+#### Return Object
+
+```json
+{
+  "image_path": "C:\\images\\source.png",
+  "file_name": "source.png",
+  "detected_content_type": "Photographic / Continuous Tone / Fine Art",
+  "hardware_tier": "Dedicated GPU (NVIDIA GeForce RTX 3050 Laptop GPU)",
+  "recommended_model": "realesrgan-x4plus",
+  "recommended_target": "16k",
+  "recommended_tile_size": 256,
+  "recommended_gpu_id": "auto",
+  "target_resolution_reasoning": "Source image is >=20 MP. Native 16K (4x) upscale is ideal for large-format exhibition master prints.",
+  "model_selection_reasoning": "Detected Photographic art on NVIDIA GeForce RTX 3050. 'realesrgan-x4plus' with 256px tiling delivers pristine textural and fine-art fidelity.",
+  "ready_command": "upscalex upscale \"source.png\" --target 16k --model realesrgan-x4plus --tile-size 256",
+  "is_model_installed": true
+}
+```
+
+---
+
+### 3. `download_model`
+
+Downloads open-weight model files on demand from upstream mirrors into local storage.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `model_id` | `string` | Yes | Model ID to download (e.g. `'4x-ultrasharp'`, `'4x-nmkd-superscale'`, `'realesr-general-x4v3'`). |
+
+#### Return Object
+
+```json
+{
+  "success": true,
+  "model_id": "4x-ultrasharp",
+  "name": "4x UltraSharp (Community Edition)",
+  "status": "downloaded",
+  "message": "Model '4x UltraSharp (Community Edition)' successfully downloaded.",
+  "size_str": "67.04 MB"
+}
+```
+
+---
+
+### 4. `get_image_metadata`
 
 Inspects pixel dimensions, color channels, format, and physical print dimensions at 300 DPI.
 
