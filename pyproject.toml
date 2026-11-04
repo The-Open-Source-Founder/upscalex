@@ -42,5 +42,12 @@ dev = [
 upscalex = "upscalex.cli:main"
 upscalex-mcp = "upscalex.server:main"
 
+[project.urls]
+Homepage = "https://github.com/The-Open-Source-Founder/upscalex"
+Documentation = "https://github.com/The-Open-Source-Founder/upscalex#readme"
+Repository = "https://github.com/The-Open-Source-Founder/upscalex.git"
+Issues = "https://github.com/The-Open-Source-Founder/upscalex/issues"
+Changelog = "https://github.com/The-Open-Source-Founder/upscalex/releases"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/upscalex"]

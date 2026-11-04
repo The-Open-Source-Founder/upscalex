@@ -41,7 +41,23 @@ Instructions:
 
 ---
 
-## 2. Manual Installation Guide
+## 2. Quick Installation via PyPI
+
+For standalone CLI and MCP server usage, install directly via `pip`:
+
+```bash
+pip install upscalex
+```
+
+Verify the installation:
+```bash
+upscalex doctor
+upscalex models
+```
+
+---
+
+## 3. Manual Installation from Source
 
 ### Prerequisites
 

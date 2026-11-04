@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" alt="UpscaleX Banner" width="100%">
+  <img src="https://raw.githubusercontent.com/The-Open-Source-Founder/upscalex/main/assets/banner.png" alt="UpscaleX Banner" width="100%">
 </p>
 
 # UpscaleX MCP/CLI
@@ -55,7 +55,7 @@ Engineered for digital print workflows, large-format poster production, fine art
 Below is an empirical comparison demonstrating UpscaleX 4x super-resolution reconstruction on a low-resolution pixelated source (`663 × 531` px, 0.35 MP) upscaled to high-definition print fidelity (`2,652 × 2,124` px, 5.63 MP) using the `realesrgan-x4plus` model.
 
 <p align="center">
-  <img src="assets/comparison.png" alt="UpscaleX Quality Comparison" width="100%">
+  <img src="https://raw.githubusercontent.com/The-Open-Source-Founder/upscalex/main/assets/comparison.png" alt="UpscaleX Quality Comparison" width="100%">
 </p>
 
 | Metric | Original Source | UpscaleX 4x Output |
@@ -82,11 +82,15 @@ Comprehensive technical guides are available in the [`docs/`](docs/) directory a
 
 ---
 
-## Quickstart with uv
+## Quickstart
 
-### Installation
+### Option 1: Install from PyPI (Simplest for CLI & MCP)
 
-Clone the repository and install using [`uv`](https://github.com/astral-sh/uv):
+```bash
+pip install upscalex
+```
+
+### Option 2: Clone and Install from Source (with uv)
 
 ```bash
 git clone https://github.com/The-Open-Source-Founder/upscalex.git
