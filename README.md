@@ -1,47 +1,71 @@
-# UpscaleX MCP/CLI 🚀
+# UpscaleX MCP/CLI
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![MCP: Enabled](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io)
-[![Vulkan GPU](https://img.shields.io/badge/Acceleration-Vulkan%20GPU-orange.svg)](https://www.khronos.org/vulkan/)
+[![Acceleration: Vulkan GPU](https://img.shields.io/badge/Acceleration-Vulkan%20GPU-orange.svg)](https://www.khronos.org/vulkan/)
 
-**UpscaleX MCP/CLI** is a production-grade **8K/16K image upscaler CLI** and **Model Context Protocol (MCP) server** powered by **RealESRGAN**, **Vulkan GPU hardware acceleration**, and **Lanczos supersampling**.
+UpscaleX is a production-grade 8K and 16K image upscaler CLI and Model Context Protocol (MCP) server powered by RealESRGAN, Vulkan GPU hardware acceleration, and Lanczos supersampling.
 
-Designed for high-end digital print shops, poster production, gallery artwork, and autonomous AI agents in Claude Desktop, Antigravity, and Cursor.
-
----
-
-## ✨ Features
-
-- 🖥️ **Dual Interface**: Full-featured interactive CLI (`upscalex`) and standard Model Context Protocol server (`upscalex-mcp`).
-- 🎯 **8K & 16K Ultra-Resolution Presets**:
-  - **16K**: Native 4× RealESRGAN deep-learning model upscale (up to 400+ Megapixels).
-  - **8K**: 4× deep-learning upscale downscaled via high-precision Lanczos resampling (SSAA supersampling antialiasing) for razor-sharp lines and zero noise.
-  - **4K / Custom**: Scale to any custom resolution or print aspect ratio.
-- ⚡ **Zero-CUDA Hassle**: Uses Vulkan C++ runtime—runs at full hardware speed on NVIDIA, AMD, and Intel GPUs without compiling CUDA wheels.
-- 🧩 **Smart VRAM Tiling**: Configurable GPU tiling (`--tile-size 256`) processes ultra-gigapixel images without Out-Of-Memory (OOM) crashes on 4GB/6GB/8GB GPUs.
-- 🛡️ **Decompression Bomb Protection Bypass**: Configured with automatic PIL safety overrides for multi-gigabyte print bitmaps.
-- 📦 **Automated Engine Downloader**: Automatically retrieves and validates the official precompiled Real-ESRGAN binary if not already installed.
-- 📐 **Print Sizing & DPI Inspector**: Calculates physical print dimensions (inches/cm) at 300 DPI (Gallery standard), 150 DPI, and 72 DPI.
+Engineered for digital print workflows, large-format poster production, fine art reproductions, and autonomous AI coding agents in Claude Desktop, Antigravity, and Cursor.
 
 ---
 
-## 🚀 Quickstart with `uv`
+## Table of Contents
 
-### 1. Installation
+- [Key Features](#key-features)
+- [Documentation Directory](#documentation-directory)
+- [Quickstart with uv](#quickstart-with-uv)
+- [Command-Line Interface](#command-line-interface)
+- [Model Context Protocol (MCP) Integration](#model-context-protocol-mcp-integration)
+- [Model Matrix](#model-matrix)
+- [Testing and Verification](#testing-and-verification)
+- [Contributing](#contributing)
+- [License](#license)
 
-Clone the repository and install with [`uv`](https://github.com/astral-sh/uv):
+---
+
+## Key Features
+
+- **Dual-Mode Operation**: Interactive command-line interface (`upscalex`) and standard Model Context Protocol server (`upscalex-mcp`).
+- **8K and 16K Presets**:
+  - **16K**: Native 4x RealESRGAN deep-learning model upscale producing master files up to 400+ Megapixels.
+  - **8K**: 4x deep-learning inference followed by Lanczos-3 downsampling (Supersampling Anti-Aliasing / SSAA) for sharp edges and zero noise.
+  - **Custom Dimensions**: Proportional scaling to arbitrary resolutions or physical print aspect ratios.
+- **Vulkan Hardware Acceleration**: High-performance C++ inference across NVIDIA, AMD, and Intel GPUs without compiling CUDA wheels.
+- **Memory-Safe Tiling**: Sliding-window spatial tile decomposition (`--tile-size 256`) processes ultra-gigapixel images without Out-Of-Memory (OOM) failures on 4GB to 8GB GPUs.
+- **Automated Engine Provisioning**: Downloads and validates the precompiled platform binary automatically if not found locally.
+- **Print Fidelity Analysis**: Automatically calculates physical print dimensions in inches and centimeters at 300 DPI, 150 DPI, and 72 DPI.
+
+---
+
+## Documentation Directory
+
+Comprehensive technical guides are available in the [`docs/`](docs/) directory:
+
+- [CLI Reference Guide](docs/cli-guide.md): Complete flag documentation, tiling strategies, and execution examples.
+- [Model Context Protocol (MCP) Guide](docs/mcp-guide.md): JSON-RPC tool contracts, parameter schemas, and multi-client configuration.
+- [Architecture & Mathematics Specification](docs/architecture.md): Deep-learning foundations, RRDB networks, Lanczos kernels, and memory bounds.
+- [Contributing Guide](CONTRIBUTING.md): Code standards, test procedures, and pull request workflow.
+
+---
+
+## Quickstart with uv
+
+### Installation
+
+Clone the repository and install using [`uv`](https://github.com/astral-sh/uv):
 
 ```bash
-git clone https://github.com/your-username/upscalex.git
+git clone https://github.com/The-Open-Source-Founder/upscalex.git
 cd upscalex
 
-# Create environment and install
+# Create virtual environment and install package
 uv venv
 uv pip install -e .
 ```
 
-### 2. Verify Available Models & Engine
+### Inspect Available Models
 
 ```bash
 upscalex models
@@ -49,55 +73,51 @@ upscalex models
 
 ---
 
-## 💻 CLI Usage
+## Command-Line Interface
 
-### Upscale an Image to 16K (Default)
+### 16K Upscale (Default 4x Model)
+
 ```bash
 upscalex upscale input.png --target 16k
 ```
 
-### Upscale an Image to 8K (Supersampled)
+### 8K Supersampled Upscale
+
 ```bash
 upscalex upscale poster.png --target 8k -o poster_8k.png
 ```
 
-### Upscale Anime / Digital Illustrations
+### 2D Illustration / Anime Artwork
+
 ```bash
-upscalex upscale artwork.png --model realesrgan-x4plus-anime --target 8k
+upscalex upscale graphic.png --model realesrgan-x4plus-anime --target 8k
 ```
 
-### Inspect Image & Print Sizing at 300 DPI
+### Image and Print Sizing Inspection
+
 ```bash
-upscalex info client_poster.png
+upscalex info input.png
 ```
 
-### CLI Command Options
-
-| Option | Flag | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `--target` | `-t` | `16k` | Target resolution: `16k`, `8k`, `4k`, `4x`, `2x`, or `WIDTHxHEIGHT` |
-| `--model` | `-m` | `realesrgan-x4plus` | Pre-trained model (`realesrgan-x4plus`, `realesrgan-x4plus-anime`) |
-| `--output` | `-o` | Auto | Destination file path |
-| `--tile-size` | | `256` | Tile size in pixels (safe for 4GB VRAM) |
-| `--gpu-id` | `-g` | `1` | Vulkan GPU index (typically `1` for discrete NVIDIA laptop GPU) |
-| `--tta` | `-x` | `False` | Test-Time Augmentation (enhances quality, increases runtime) |
+For complete options and arguments, see the [CLI Guide](docs/cli-guide.md).
 
 ---
 
-## 🤖 Model Context Protocol (MCP) Integration
+## Model Context Protocol (MCP) Integration
 
-Run as a native MCP server to allow AI assistants (Claude, Antigravity, Cursor) to inspect and upscale print images autonomously.
+UpscaleX runs as a native MCP server, enabling LLM agents to inspect image properties, evaluate print viability, and execute upscaling autonomously.
 
-### Start MCP Server manually
+### Server Invocation
+
 ```bash
 upscalex-mcp
 # or
 upscalex serve
 ```
 
-### Claude Desktop Configuration
+### Client Configuration
 
-Add this to your `claude_desktop_config.json`:
+Add this entry to your MCP client configuration file:
 
 ```json
 {
@@ -115,44 +135,41 @@ Add this to your `claude_desktop_config.json`:
 }
 ```
 
-### Antigravity / Cursor Configuration
-
-Add this to your `.gemini/settings.json` or `.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "upscalex": {
-      "command": "uv",
-      "args": [
-        "run",
-        "--directory",
-        "C:\\Companies\\printing_businesses\\custom_orders\\upscalex",
-        "upscalex-mcp"
-      ]
-    }
-  }
-}
-```
-
-### Exposed MCP Tools
-
-1. `upscale_image`: Upscale any image to 16K, 8K, 4K, or custom size with model and GPU options.
-2. `get_image_metadata`: Extract dimensions, aspect ratio, megapixels, and 300 DPI print measurements.
-3. `list_available_models`: Inspect available RealESRGAN models.
-4. `calculate_print_dpi`: Calculate effective DPI for target print dimensions and get actionable upscaling recommendations.
+Detailed configuration instructions for Claude Desktop, Antigravity, and Cursor are provided in the [MCP Guide](docs/mcp-guide.md).
 
 ---
 
-## 🧪 Running Tests
+## Model Matrix
+
+| Model ID | Native Scale | Target Media | Application |
+| :--- | :--- | :--- | :--- |
+| `realesrgan-x4plus` | 4x | General / Photography | Default model for real-world photos, fine art, textures, and print posters. |
+| `realesrgan-x4plus-anime` | 4x | Anime / Illustration | Optimized for digital art, vector illustrations, line work, and comics. |
+| `realesr-animevideov3-x2` | 2x | Animation / Video | Rapid 2x turnaround model for video frames and lightweight 2D assets. |
+| `realesr-animevideov3-x3` | 3x | Animation / Video | Rapid 3x turnaround model for video frames and lightweight 2D assets. |
+| `realesr-animevideov3-x4` | 4x | Animation / Video | Rapid 4x turnaround model for video frames and lightweight 2D assets. |
+
+---
+
+## Testing and Verification
+
+Run the test suite to verify model resolution calculation, CLI exit codes, and live GPU inference:
 
 ```bash
 uv pip install -e ".[dev]"
-pytest -v
+uv run pytest -v
 ```
+
+All tests must pass prior to submitting changes.
 
 ---
 
-## 📄 License
+## Contributing
 
-MIT License. See [LICENSE](LICENSE) for details.
+Contributions to UpscaleX are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for coding standards, pull request processes, and development guidelines.
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
