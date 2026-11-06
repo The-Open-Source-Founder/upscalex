@@ -1,0 +1,84 @@
+================================================================================
+UPSCALEX: SOCIAL MEDIA COPY (INSTAGRAM & LINKEDIN)
+Format: Plain text, zero emojis, professional engineering voice
+================================================================================
+
+--------------------------------------------------------------------------------
+1. INSTAGRAM CAPTION & HASHTAGS
+--------------------------------------------------------------------------------
+
+We open-sourced UpscaleX: an 8K and 16K image upscaler CLI and FastMCP server built with RealESRGAN and native Vulkan GPU acceleration.
+
+Commercial printing requires 300 DPI at 24x36 inches (77.8 Megapixels). Most open-source AI upscalers crash with CUDA Out-Of-Memory errors or hit Pillow limits above 178 Megapixels.
+
+UpscaleX solves this with three core architectural primitives:
+1. Spatial 256px Sliding-Window Tiling: caps peak VRAM under 1.2GB, eliminating memory exhaustion on consumer 4GB to 6GB laptop GPUs.
+2. Cross-Platform Vulkan Runtime: native GPU acceleration across Windows, Linux, and macOS, with automatic fallback to multi-threaded CPU on headless servers.
+3. Lanczos-3 Supersampling: 4x deep-learning inference downscaled to 8K to remove high-frequency ringing artifacts for razor-sharp physical prints.
+
+Quickstart Installation:
+pip install upscalex
+
+Usage:
+upscalex doctor
+upscalex upscale photo.png --target 16k
+
+Autonomous Agent Integration:
+UpscaleX runs as a native Model Context Protocol (MCP) server over standard input/output. Claude Desktop, Cursor, and Antigravity agents can inspect print DPI, recommend models, and execute 16K upscales directly via JSON-RPC.
+
+PyPI: https://pypi.org/project/upscalex/
+Repository: https://github.com/The-Open-Source-Founder/upscalex.git
+
+Comment UPSCALEX below to receive the one-click MCP configuration snippet and agent prompt stack.
+
+#OpenSource #UpscaleX #RealESRGAN #ModelContextProtocol #AIEngineering #MachineLearning #Python #ComputerVision #SoftwareArchitecture
+
+
+--------------------------------------------------------------------------------
+2. LINKEDIN POST & HASHTAGS
+--------------------------------------------------------------------------------
+
+Most open-source AI super-resolution tools fail when transitioning from prototype web previews to physical print production.
+
+A standard commercial 24x36 inch fine-art print at 300 DPI requires 77.8 Megapixels (7,200 x 10,800). Large-format exhibition posters and digital displays often require 16K resolution (over 400 Megapixels).
+
+At these dimensions, standard Python scripts fail with two common bottlenecks:
+- PyTorch / CUDA Out-Of-Memory (OOM) crashes on consumer or laptop GPUs.
+- Pillow DecompressionBombError exceptions, which block images exceeding 178 Megapixels.
+
+To solve this, we engineered and open-sourced UpscaleX: a production-grade CLI and Model Context Protocol (MCP) server powered by RealESRGAN.
+
+Key Architectural Primitives:
+
+1. Memory-Bounded Spatial Tiling
+Inference is decomposed into 256px sliding-window tiles. This caps peak VRAM consumption to under 1.2GB, enabling native 16K rendering on a standard 4GB NVIDIA RTX 3050 laptop GPU without memory exhaustion.
+
+2. Cross-Platform Vulkan Engine with CPU Fallback
+By targeting the Vulkan compute API instead of vendor-locked CUDA stacks, UpscaleX runs natively across Windows, Linux, and macOS (via MoltenVK). In headless CI/CD containers or systems lacking graphics drivers, the engine falls back to multi-threaded CPU Lanczos supersampling with zero crashes.
+
+3. Lanczos-3 Supersampling Anti-Aliasing (SSAA)
+For 8K deliverables, the engine performs native 4x deep-learning inference followed by Lanczos-3 downsampling. This eliminates edge ringing artifacts and noise while preserving textural detail.
+
+4. Native FastMCP Server for AI Coding Agents
+UpscaleX implements the Model Context Protocol over stdio. Autonomous agents in Claude Desktop, Cursor, and Antigravity can query image metadata, calculate physical print DPI, select optimal models, and execute upscaling autonomously via JSON-RPC.
+
+Quickstart:
+pip install upscalex
+
+Command Line:
+upscalex doctor
+upscalex upscale photo.png --target 16k --tile-size 256
+
+MCP Client Configuration:
+{
+  "mcpServers": {
+    "upscalex": {
+      "command": "upscalex-mcp"
+    }
+  }
+}
+
+PyPI: https://pypi.org/project/upscalex/
+GitHub: https://github.com/The-Open-Source-Founder/upscalex.git
+
+#OpenSource #ArtificialIntelligence #SoftwareEngineering #ComputerVision #DeepLearning #Python #ModelContextProtocol #SystemArchitecture
