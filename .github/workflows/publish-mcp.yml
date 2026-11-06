@@ -44,8 +44,12 @@ jobs:
 
       - name: Publish server.json to MCP Registry
         run: |
-          ./mcp-publisher publish > publish.log 2>&1 || (echo "FAILED_TO_PUBLISH" && cat publish.log && exit 1)
-          cat publish.log
+          if ! ./mcp-publisher publish > publish.log 2>&1; then
+            ERR=$(cat publish.log | tr '\r\n' ' ')
+            echo "::error::MCP Publish Error: $ERR"
+            cat publish.log
+            exit 1
+          fi
 
       - name: Upload publish log on failure
         if: always()
