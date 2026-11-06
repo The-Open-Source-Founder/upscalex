@@ -4,6 +4,7 @@
 
 # UpscaleX MCP/CLI
 
+<!-- mcp-name: io.github.The-Open-Source-Founder/upscalex -->
 <!-- mcp-name: io.github.the-open-source-founder/upscalex -->
 
 [![PyPI: Version](https://img.shields.io/pypi/v/upscalex.svg)](https://pypi.org/project/upscalex/)

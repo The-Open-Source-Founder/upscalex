@@ -3,7 +3,7 @@ UpscaleX MCP/CLI
 High-performance 8K/16K image upscaling with Vulkan GPU acceleration and Model Context Protocol.
 """
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 from .engine import RealESRGANEngine
 from .server import mcp
