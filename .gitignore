@@ -40,6 +40,9 @@ models/
 .coverage
 htmlcov/
 
+# CLI tools & binaries
+mcp-publisher*
+
 # IDE / OS
 .vscode/
 .idea/

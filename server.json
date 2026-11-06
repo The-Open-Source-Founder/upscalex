@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.the-open-source-founder/upscalex",
+  "title": "UpscaleX",
+  "description": "Production 16K image upscaler and model gateway via RealESRGAN and Vulkan.",
+  "version": "0.1.1",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "upscalex",
+      "version": "0.1.1",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ],
+  "repository": {
+    "url": "https://github.com/The-Open-Source-Founder/upscalex",
+    "source": "github"
+  }
+}

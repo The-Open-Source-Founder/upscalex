@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "upscalex"
-version = "0.1.0"
+version = "0.1.1"
 description = "UpscaleX MCP/CLI: Production-grade 8K/16K image upscaler CLI and Model Context Protocol (MCP) server powered by RealESRGAN, Vulkan GPU acceleration, and Lanczos supersampling."
 readme = "README.md"
 authors = [

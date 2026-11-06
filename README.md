@@ -4,6 +4,8 @@
 
 # UpscaleX MCP/CLI
 
+<!-- mcp-name: io.github.the-open-source-founder/upscalex -->
+
 [![PyPI: Version](https://img.shields.io/pypi/v/upscalex.svg)](https://pypi.org/project/upscalex/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
